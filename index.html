@@ -93,7 +93,12 @@
 
                 for (let i = 0; i < requiredFiles.length; i++) {
                     const fileName = requiredFiles[i];
-                    const fileKey = fileName.split('.')[0].replace('_', '');
+                    let fileKey = fileName.split('.')[0]; // Get "routes", "trips", "shapes", "stops", "stop_times"
+                    if (fileName === "stop_times.txt") {
+                        fileKey = "stopTimes"; // Explicitly set to camelCase for stop_times
+                    } else {
+                        fileKey = fileKey.replace('_', ''); // Handle other potential cases like 'route_types' if added later
+                    }
                     loadingPopup.textContent = `Parsing ${fileName} (${i + 1} of ${requiredFiles.length})...`;
 
                     const fileInZip = zip.file(fileName);
