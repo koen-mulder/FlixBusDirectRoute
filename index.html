@@ -35,6 +35,9 @@
         <option value="">-- Select a Stop to Filter Routes --</option>
     </select>
     <div id="map"></div>
+    <div id="loadingPopup" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px; background: rgba(0,0,0,0.8); color: white; border-radius: 10px; z-index: 2000; font-size: 1.2em; box-shadow: 0 0 15px rgba(0,0,0,0.5);">
+        Loading GTFS data...
+    </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
@@ -61,6 +64,8 @@
 
         // File input handling
         const fileInput = document.getElementById('gtfsFile');
+        const loadingPopup = document.getElementById('loadingPopup');
+
         fileInput.addEventListener('change', async function(event) {
             const file = event.target.files[0];
             if (!file) {
@@ -68,10 +73,13 @@
                 return;
             }
             console.log("File selected:", file.name);
+            loadingPopup.textContent = 'Loading and unzipping file...';
+            loadingPopup.style.display = 'block'; // Show loading popup
 
             try {
                 const zip = await JSZip.loadAsync(file);
                 console.log("ZIP file loaded.");
+                loadingPopup.textContent = 'Parsing GTFS data files...';
 
                 const requiredFiles = ["routes.txt", "trips.txt", "shapes.txt", "stops.txt", "stop_times.txt"];
                 const parsedData = {
@@ -112,6 +120,7 @@
                     parsedData.stopTimes
                 );
                 // console.log("Processed GTFS Data (for GeoJSON):", processedData); // Will log routesGeoJson and stopsGeoJson
+                loadingPopup.textContent = 'Processing data and building map layers...';
 
                 // Store data for potential filtering and display
                 if (processedData) {
@@ -126,6 +135,8 @@
 
             } catch (error) {
                 console.error("Error processing data or displaying on map:", error);
+            } finally {
+                loadingPopup.style.display = 'none'; // Hide loading popup
             }
         });
 
