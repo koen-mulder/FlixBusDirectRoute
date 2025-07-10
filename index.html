@@ -532,7 +532,17 @@
 
     function handleFromHere(stopId, lat, lon) {
         console.log(`"From here" button clicked for Stop ID: ${stopId}, Lat: ${lat}, Lon: ${lon}`);
-        // Placeholder for future functionality
+
+        const selector = document.getElementById('stopSelector');
+        if (selector) {
+            selector.value = stopId;
+
+            // Create and dispatch a 'change' event
+            const changeEvent = new Event('change', { bubbles: true });
+            selector.dispatchEvent(changeEvent);
+        } else {
+            console.error("Stop selector not found.");
+        }
     }
     </script>
 </body>
