@@ -31,6 +31,9 @@
 </head>
 <body>
     <input type="file" id="gtfsFile" accept=".zip">
+    <select id="stopSelector" style="position: absolute; top: 50px; left: 10px; z-index: 1000; padding: 5px; background: white; border: 1px solid #ccc; border-radius: 5px; max-width: 200px;">
+        <option value="">-- Select a Stop to Filter Routes --</option>
+    </select>
     <div id="map"></div>
 
     <!-- Leaflet JS -->
@@ -70,10 +73,17 @@
                 const zip = await JSZip.loadAsync(file);
                 console.log("ZIP file loaded.");
 
-                const requiredFiles = ["routes.txt", "trips.txt", "shapes.txt"];
-                const parsedData = {};
+                const requiredFiles = ["routes.txt", "trips.txt", "shapes.txt", "stops.txt", "stop_times.txt"];
+                const parsedData = {
+                    routes: [],
+                    trips: [],
+                    shapes: [],
+                    stops: [],
+                    stopTimes: []
+                };
 
                 for (const fileName of requiredFiles) {
+                    const fileKey = fileName.split('.')[0].replace('_', ''); // e.g., stop_times -> stopTimes
                     const fileInZip = zip.file(fileName);
                     if (fileInZip) {
                         console.log(`Processing ${fileName}...`);
@@ -83,38 +93,112 @@
                             skipEmptyLines: true,
                             dynamicTyping: true // Automatically convert numbers and booleans
                         });
-                        parsedData[fileName.split('.')[0]] = result.data;
+                        parsedData[fileKey] = result.data; // Use fileKey here
                         console.log(`${fileName} parsed successfully. Found ${result.data.length} records.`);
                     } else {
                         console.warn(`${fileName} not found in the ZIP.`);
-                        parsedData[fileName.split('.')[0]] = []; // Ensure array exists even if file is missing
+                        // parsedData[fileKey] is already initialized to []
                     }
                 }
 
-                console.log("Parsed GTFS Data:", {
-                    routes: parsedData.routes,
-                    trips: parsedData.trips,
-                    routes: parsedData.routes || [],
-                    trips: parsedData.trips || [],
-                    shapes: parsedData.shapes || []
-                });
+                console.log("Parsed GTFS Data:", parsedData);
 
-                // Call processGtfsData
-                const geojsonData = await processGtfsData(parsedData.routes || [], parsedData.trips || [], parsedData.shapes || []);
-                console.log("Final GeoJSON FeatureCollection:", geojsonData);
+                // Call processGtfsData with all parsed data
+                const processedData = await processGtfsData(
+                    parsedData.routes,
+                    parsedData.trips,
+                    parsedData.shapes,
+                    parsedData.stops,
+                    parsedData.stopTimes
+                );
+                // console.log("Processed GTFS Data (for GeoJSON):", processedData); // Will log routesGeoJson and stopsGeoJson
 
-                // Display routes on map
-                displayRoutesOnMap(geojsonData);
+                // Store data for potential filtering and display
+                if (processedData) {
+                    fullRoutesGeoJson = processedData.routesGeoJson; // Store for reset
+                    stopToRouteIdsData = processedData.stopToRouteIdsMap;
+                    // Initial display of all routes and stops
+                    displayGtfsDataOnMap(processedData.routesGeoJson, processedData.stopsGeoJson);
+                    // Populate stop selector
+                    populateStopSelector(processedData.stopsGeoJson);
+                }
+
 
             } catch (error) {
                 console.error("Error processing data or displaying on map:", error);
             }
         });
 
-        async function processGtfsData(routes, trips, shapes) {
-            console.log("Processing GTFS data into GeoJSON...");
+        async function processGtfsData(routes, trips, shapes, stops, stopTimes) { // Added stops, stopTimes
+            console.log("Processing GTFS data...");
+            // console.log("Received stops for processing:", stops);
+            // console.log("Received stopTimes for processing:", stopTimes);
 
-            // 2. Group Shape Points
+            // Process Stops into GeoJSON Points
+            const stopsGeoJsonFeatures = [];
+            if (stops && stops.length > 0) {
+                stops.forEach(stop => {
+                    if (stop.stop_id && stop.stop_name && stop.stop_lon != null && stop.stop_lat != null) {
+                        stopsGeoJsonFeatures.push({
+                            type: "Feature",
+                            geometry: {
+                                type: "Point",
+                                coordinates: [parseFloat(stop.stop_lon), parseFloat(stop.stop_lat)]
+                            },
+                            properties: {
+                                stop_id: stop.stop_id,
+                                stop_name: stop.stop_name,
+                                stop_code: stop.stop_code,
+                                stop_desc: stop.stop_desc,
+                                zone_id: stop.zone_id,
+                                stop_url: stop.stop_url,
+                                location_type: stop.location_type,
+                                parent_station: stop.parent_station,
+                                wheelchair_boarding: stop.wheelchair_boarding
+                                // Add other relevant stop properties if needed
+                            }
+                        });
+                    } else {
+                        // console.warn("Skipping stop with missing critical data (id, name, lon, or lat):", stop);
+                    }
+                });
+            }
+            const stopsGeoJson = { type: "FeatureCollection", features: stopsGeoJsonFeatures };
+            console.log("Stops GeoJSON created:", stopsGeoJson);
+
+            // Create Stop-Route Linkages (Part 4.2 Step 4)
+            const stopToRouteIdsMap = {};
+            const tripToRouteMap = {}; // Helper to quickly get route_id from trip_id
+
+            if (trips && trips.length > 0) {
+                trips.forEach(trip => {
+                    if (trip.trip_id && trip.route_id) {
+                        tripToRouteMap[trip.trip_id] = trip.route_id;
+                    }
+                });
+            }
+
+            if (stopTimes && stopTimes.length > 0) {
+                stopTimes.forEach(stopTime => {
+                    if (stopTime.trip_id && stopTime.stop_id) {
+                        const routeId = tripToRouteMap[stopTime.trip_id];
+                        if (routeId) {
+                            if (!stopToRouteIdsMap[stopTime.stop_id]) {
+                                stopToRouteIdsMap[stopTime.stop_id] = new Set(); // Use a Set to avoid duplicate route_ids
+                            }
+                            stopToRouteIdsMap[stopTime.stop_id].add(routeId);
+                        }
+                    }
+                });
+            }
+            // Convert Sets to Arrays for easier use later, if needed, or keep as Sets
+            for (const stopId in stopToRouteIdsMap) {
+                stopToRouteIdsMap[stopId] = Array.from(stopToRouteIdsMap[stopId]);
+            }
+            console.log("Stop to Route IDs Map:", stopToRouteIdsMap);
+
+
+            // Existing: 2. Group Shape Points
             const shapeGeometries = {};
             if (shapes && shapes.length > 0) {
                 shapes.forEach(point => {
@@ -188,23 +272,95 @@
                 });
             }
             console.log("GeoJSON features built:", geojsonFeatures);
+            const routesGeoJson = { type: "FeatureCollection", features: geojsonFeatures };
 
-            // 5. Return the Final Object
-            return { type: "FeatureCollection", features: geojsonFeatures };
+            // 5. Return the Final Object(s)
+            return {
+                routesGeoJson: routesGeoJson,
+                stopsGeoJson: stopsGeoJson, // Include stopsGeoJson created earlier
+                stopToRouteIdsMap: stopToRouteIdsMap // Make this available
+            };
         }
 
-        let currentGeoJsonLayer = null; // To keep track of the current routes layer
+        let currentRoutesLayer = null;
+        let currentStopsLayer = null;
+        let fullRoutesGeoJson = null; // To store the unfiltered routes
+        let stopToRouteIdsData = null; // To store the map for filtering
 
-        function displayRoutesOnMap(geojson) {
-            console.log("Displaying GeoJSON on map:", geojson);
-
-            // 2. Clear Old Data
-            if (currentGeoJsonLayer) {
-                map.removeLayer(currentGeoJsonLayer);
-                currentGeoJsonLayer = null;
+        function populateStopSelector(stopsGeoJson) {
+            const selector = document.getElementById('stopSelector');
+            // Clear existing options except the first one
+            while (selector.options.length > 1) {
+                selector.remove(1);
             }
 
-            // 3. Implement Styling Function
+            if (stopsGeoJson && stopsGeoJson.features) {
+                // Sort stops by name for easier selection
+                const sortedStops = [...stopsGeoJson.features].sort((a, b) => {
+                    const nameA = a.properties.stop_name.toLowerCase();
+                    const nameB = b.properties.stop_name.toLowerCase();
+                    if (nameA < nameB) return -1;
+                    if (nameA > nameB) return 1;
+                    return 0;
+                });
+
+                sortedStops.forEach(feature => {
+                    if (feature.properties && feature.properties.stop_id && feature.properties.stop_name) {
+                        const option = document.createElement('option');
+                        option.value = feature.properties.stop_id;
+                        option.textContent = feature.properties.stop_name;
+                        selector.appendChild(option);
+                    }
+                });
+            }
+        }
+
+        // Event listener for stop selector
+        document.getElementById('stopSelector').addEventListener('change', function(event) {
+            const selectedStopId = event.target.value;
+
+            if (!fullRoutesGeoJson || !stopToRouteIdsData) {
+                console.warn("Data not fully loaded yet for filtering.");
+                return;
+            }
+
+            if (selectedStopId) {
+                const routeIdsForStop = stopToRouteIdsData[selectedStopId];
+                if (routeIdsForStop && routeIdsForStop.length > 0) {
+                    const filteredFeatures = fullRoutesGeoJson.features.filter(feature =>
+                        routeIdsForStop.includes(feature.properties.route_id)
+                    );
+                    const filteredRoutes = { type: "FeatureCollection", features: filteredFeatures };
+                    displayGtfsDataOnMap(filteredRoutes, null); // Display filtered routes, don't re-process stopsGeoJson here
+                                                              // We might want to pass the original stopsGeoJson if we want to highlight the selected stop
+                } else {
+                    console.log(`No routes found for stop ${selectedStopId}. Displaying no routes.`);
+                    displayGtfsDataOnMap({ type: "FeatureCollection", features: [] }, null); // Display no routes
+                }
+            } else {
+                // No stop selected (or "-- Select --" chosen), display all routes
+                displayGtfsDataOnMap(fullRoutesGeoJson, null); // Display all routes
+            }
+        });
+
+        function displayGtfsDataOnMap(routesGeoJson, stopsGeoJson) {
+            console.log("Displaying GTFS data on map...");
+
+            // Clear Old Route Data
+            if (currentRoutesLayer) {
+                map.removeLayer(currentRoutesLayer);
+                currentRoutesLayer = null;
+            }
+
+            // Only clear and re-add stops if stopsGeoJson is provided (i.e., initial load)
+            if (stopsGeoJson !== undefined && stopsGeoJson !== null) { // Check specifically for undefined/null
+                if (currentStopsLayer) {
+                    map.removeLayer(currentStopsLayer);
+                    currentStopsLayer = null;
+                }
+            }
+
+            // Styling for Routes
             function routeStyle(feature) {
                 return {
                     color: feature.properties.route_color || '#808080', // Default to grey if no color
@@ -230,24 +386,68 @@
                 }
             }
 
-            // 5. Create and Add GeoJSON Layer
-            if (geojson && geojson.features && geojson.features.length > 0) {
-                currentGeoJsonLayer = L.geoJSON(geojson, {
+            // Create and Add Routes Layer
+            if (routesGeoJson && routesGeoJson.features && routesGeoJson.features.length > 0) {
+                currentRoutesLayer = L.geoJSON(routesGeoJson, {
                     style: routeStyle,
                     onEachFeature: onEachRouteFeature
                 }).addTo(map);
-
-                // 6. Fit Map to Bounds
-                if (currentGeoJsonLayer && typeof currentGeoJsonLayer.getBounds === 'function') {
-                    const bounds = currentGeoJsonLayer.getBounds();
-                    if (bounds.isValid()) {
-                        map.fitBounds(bounds);
-                    } else {
-                        console.warn("Could not fit map to bounds: bounds are invalid.");
-                    }
-                }
             } else {
-                console.log("No features to display on map.");
+                console.log("No route features to display on map.");
+            }
+
+            // Create and Add Stops Layer (only if stopsGeoJson is provided)
+            if (stopsGeoJson && stopsGeoJson.features && stopsGeoJson.features.length > 0) {
+                currentStopsLayer = L.geoJSON(stopsGeoJson, {
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 5,
+                            fillColor: "pink",
+                            color: "#000",
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: function (feature, layer) { // Popup for stops
+                        if (feature.properties && feature.properties.stop_name) {
+                            layer.bindPopup(`<strong>Stop: ${feature.properties.stop_name}</strong><br><small>ID: ${feature.properties.stop_id}</small>`);
+                        }
+                    }
+                }).addTo(map);
+            } else {
+                console.log("No stop features to display on map.");
+            }
+
+            // Fit Map to Bounds
+            let boundsToFit = null;
+            if (routesGeoJson && routesGeoJson.features && routesGeoJson.features.length > 0) {
+                // If there are routes, get their bounds
+                const tempRoutesLayer = L.geoJSON(routesGeoJson);
+                boundsToFit = tempRoutesLayer.getBounds();
+            }
+
+            if (stopsGeoJson && stopsGeoJson.features && stopsGeoJson.features.length > 0) {
+                // If stops are also being loaded/updated, extend bounds to include them
+                const tempStopsLayer = L.geoJSON(stopsGeoJson);
+                if (boundsToFit) {
+                    boundsToFit.extend(tempStopsLayer.getBounds());
+                } else {
+                    boundsToFit = tempStopsLayer.getBounds();
+                }
+            }
+
+            if (boundsToFit && boundsToFit.isValid()) {
+                map.fitBounds(boundsToFit);
+            } else if (routesGeoJson && routesGeoJson.features && routesGeoJson.features.length === 0) {
+                // If routes are explicitly empty (e.g. after filtering, no routes for a stop),
+                // do nothing with bounds, map stays as is. Or potentially reset to a default view.
+                // For now, doing nothing is fine.
+                console.log("No routes to fit bounds to, map view unchanged.");
+            } else if (!boundsToFit) {
+                 console.log("No features to calculate bounds from.");
+            } else if (boundsToFit && !boundsToFit.isValid()){
+                 console.warn("Could not fit map to bounds: calculated bounds are invalid.");
             }
         }
     });
