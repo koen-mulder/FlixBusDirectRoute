@@ -105,7 +105,7 @@
                 // For simplicity here, we just nullify.
                 // The old layer will be removed by displayGtfsDataOnMap,
                 // and new layers will get default styles.
-                highlightedRouteLayer = null;
+                window.highlightedRouteLayer = null;
             }
             // Also reset the main stop selector to default
             document.getElementById('stopSelector').value = "";
@@ -381,7 +381,7 @@
         let fullRoutesGeoJson = null;
         let stopToRouteIdsData = null;
         let globalRouteDetailsMap = {};
-        let highlightedRouteLayer = null;
+        window.highlightedRouteLayer = null; // Explicitly global via window object
 
     // Moved routeStyle to be accessible globally for resetting styles
     function routeStyle(feature) {
@@ -434,7 +434,7 @@
                 // When the main filter changes, the currentRoutesLayer is cleared and redrawn
                 // by displayGtfsDataOnMap, which will apply the default routeStyle.
                 // So, just nullifying highlightedRouteLayer is sufficient.
-                highlightedRouteLayer = null;
+                window.highlightedRouteLayer = null;
             }
 
             if (!fullRoutesGeoJson || !stopToRouteIdsData) {
@@ -638,23 +638,27 @@
     }
 
     function handleRouteBadgeClick(routeId) {
+        console.log("Debug handleRouteBadgeClick: typeof window.highlightedRouteLayer:", typeof window.highlightedRouteLayer, "Value:", window.highlightedRouteLayer);
         console.log("Route badge clicked for routeId:", routeId);
 
         // Unhighlight previously highlighted route
-        if (highlightedRouteLayer && highlightedRouteLayer.feature) {
+        if (window.highlightedRouteLayer && window.highlightedRouteLayer.feature) {
             // Re-apply the default style for that feature using the global routeStyle
-            highlightedRouteLayer.setStyle(routeStyle(highlightedRouteLayer.feature));
-            highlightedRouteLayer = null;
+            window.highlightedRouteLayer.setStyle(routeStyle(window.highlightedRouteLayer.feature));
+            window.highlightedRouteLayer = null;
         }
 
-        if (!currentRoutesLayer) return;
+        if (!currentRoutesLayer) { // currentRoutesLayer is already a global 'let' variable
+            console.warn("currentRoutesLayer is not available in handleRouteBadgeClick");
+            return;
+        }
 
         // Find and highlight the new route
         currentRoutesLayer.eachLayer(function(layer) {
             if (layer.feature && layer.feature.properties && layer.feature.properties.route_id === routeId) {
                 // No need to store original style anymore, it will be re-calculated by routeStyle
                 layer.setStyle({ color: '#FF0000', weight: 7, opacity: 1.0 });
-                highlightedRouteLayer = layer; // Set this as the currently highlighted one
+                window.highlightedRouteLayer = layer; // Assign to window.highlightedRouteLayer
                 layer.bringToFront();
                 // map.fitBounds(layer.getBounds()); // Optional: zoom to selected route
                 return; // Exit eachLayer loop
