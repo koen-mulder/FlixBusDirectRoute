@@ -185,44 +185,44 @@
             console.log("Stops GeoJSON created:", stopsGeoJson);
 
             // Create Stop-Route Linkages (Part 4.2 Step 4)
+            console.log("Debug: Raw trips data sample (first 5):", trips ? trips.slice(0, 5) : "Trips data is undefined/null");
+            console.log("Debug: Raw stopTimes data sample (first 5):", stopTimes ? stopTimes.slice(0, 5) : "StopTimes data is undefined/null");
+
             const stopToRouteIdsMap = {};
-            const tripToRouteMap = {}; // Helper to quickly get route_id from trip_id
+            const tripToRouteMap = {};
 
             if (trips && trips.length > 0) {
                 trips.forEach(trip => {
-                    if (trip.trip_id && trip.route_id) {
+                    if (trip && trip.trip_id && trip.route_id) {
+                        // console.log(`Debug: Adding to tripToRouteMap: trip_id='${trip.trip_id}' (type: ${typeof trip.trip_id}), route_id='${trip.route_id}' (type: ${typeof trip.route_id})`);
                         tripToRouteMap[trip.trip_id] = trip.route_id;
+                    } else {
+                        // console.warn("Debug: Invalid trip object or missing trip_id/route_id in trips array:", trip);
                     }
                 });
             }
+            console.log("Debug: tripToRouteMap constructed:", tripToRouteMap);
+
 
             if (stopTimes && stopTimes.length > 0) {
                 stopTimes.forEach(stopTime => {
-                    if (stopTime.trip_id && stopTime.stop_id) {
+                    if (stopTime && stopTime.trip_id && stopTime.stop_id) {
+                        // console.log(`Debug: Processing stopTime: trip_id='${stopTime.trip_id}' (type: ${typeof stopTime.trip_id}), stop_id='${stopTime.stop_id}' (type: ${typeof stopTime.stop_id})`);
                         const routeId = tripToRouteMap[stopTime.trip_id];
-                        if (routeId) {
-                            if (!stopToRouteIdsMap[stopTime.stop_id]) {
-                                stopToRouteIdsMap[stopTime.stop_id] = new Set(); // Use a Set to avoid duplicate route_ids
-                            }
-                            stopToRouteIdsMap[stopTime.stop_id].add(routeId);
-                        }
-                    }
-                });
-            }
-            // console.log("Debug: tripToRouteMap", JSON.parse(JSON.stringify(tripToRouteMap))); // For deep copy logging if needed
+                        // console.log(`Debug: For stopTime.trip_id '${stopTime.trip_id}', found routeId: '${routeId}' (type: ${typeof routeId})`);
 
-            if (stopTimes && stopTimes.length > 0) {
-                stopTimes.forEach(stopTime => {
-                    if (stopTime.trip_id && stopTime.stop_id) {
-                        const routeId = tripToRouteMap[stopTime.trip_id];
                         if (routeId) {
                             if (!stopToRouteIdsMap[stopTime.stop_id]) {
+                                // console.log(`Debug: Initializing Set for stop_id '${stopTime.stop_id}'`);
                                 stopToRouteIdsMap[stopTime.stop_id] = new Set();
                             }
                             stopToRouteIdsMap[stopTime.stop_id].add(routeId);
+                            // console.log(`Debug: Added route_id '${routeId}' to stop_id '${stopTime.stop_id}'. Current set for stop:`, stopToRouteIdsMap[stopTime.stop_id]);
                         } else {
-                            // console.warn(`Debug: No route_id found for trip_id '${stopTime.trip_id}' in stop_time for stop_id '${stopTime.stop_id}'.`);
+                             console.warn(`Debug: No route_id found in tripToRouteMap for trip_id '${stopTime.trip_id}' (referenced by stop_time for stop_id '${stopTime.stop_id}').`);
                         }
+                    } else {
+                        // console.warn("Debug: Invalid stopTime object or missing trip_id/stop_id in stopTimes array:", stopTime);
                     }
                 });
             }
