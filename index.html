@@ -57,10 +57,31 @@
         // Initialize Leaflet map
         const map = L.map('map').setView([51.505, -0.09], 13); // Centered on London
 
+        // Create custom panes for layer ordering
+        map.createPane('routePane');
+        map.getPane('routePane').style.zIndex = 640;
+        map.createPane('stopPane');
+        map.getPane('stopPane').style.zIndex = 650; // Higher zIndex means on top
+
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19,
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
+
+        map.on('zoomend', function() {
+            if (currentStopsLayer) {
+                const currentZoom = map.getZoom();
+                let newRadius = 5;
+                if (currentZoom < 13) {
+                    newRadius = 3;
+                }
+                currentStopsLayer.eachLayer(function(layer) {
+                    if (layer.setRadius) { // Check if it's a circleMarker
+                        layer.setRadius(newRadius);
+                    }
+                });
+            }
+        });
 
         // File input handling
         const fileInput = document.getElementById('gtfsFile');
@@ -437,7 +458,8 @@
             if (routesGeoJson && routesGeoJson.features && routesGeoJson.features.length > 0) {
                 currentRoutesLayer = L.geoJSON(routesGeoJson, {
                     style: routeStyle,
-                    onEachFeature: onEachRouteFeature
+                    onEachFeature: onEachRouteFeature,
+                    pane: 'routePane' // Assign to routePane
                 }).addTo(map);
             } else {
                 console.log("No route features to display on map.");
@@ -447,13 +469,19 @@
             if (stopsGeoJson && stopsGeoJson.features && stopsGeoJson.features.length > 0) {
                 currentStopsLayer = L.geoJSON(stopsGeoJson, {
                     pointToLayer: function (feature, latlng) {
+                        const currentZoom = map.getZoom();
+                        let radius = 5; // Default for zoom >= 13
+                        if (currentZoom < 13) {
+                            radius = 3; // Smaller for zoom < 13
+                        }
                         return L.circleMarker(latlng, {
-                            radius: 5,
+                            radius: radius,
                             fillColor: "pink",
                             color: "#000",
                             weight: 1,
                             opacity: 1,
-                            fillOpacity: 0.8
+                            fillOpacity: 0.8,
+                            pane: 'stopPane' // Assign to stopPane
                         });
                     },
                     onEachFeature: function (feature, layer) { // Popup for stops
