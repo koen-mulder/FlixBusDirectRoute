@@ -103,9 +103,11 @@
                 const geojsonData = await processGtfsData(parsedData.routes || [], parsedData.trips || [], parsedData.shapes || []);
                 console.log("Final GeoJSON FeatureCollection:", geojsonData);
 
+                // Display routes on map
+                displayRoutesOnMap(geojsonData);
 
             } catch (error) {
-                console.error("Error processing GTFS data or GeoJSON transformation:", error);
+                console.error("Error processing data or displaying on map:", error);
             }
         });
 
@@ -189,6 +191,64 @@
 
             // 5. Return the Final Object
             return { type: "FeatureCollection", features: geojsonFeatures };
+        }
+
+        let currentGeoJsonLayer = null; // To keep track of the current routes layer
+
+        function displayRoutesOnMap(geojson) {
+            console.log("Displaying GeoJSON on map:", geojson);
+
+            // 2. Clear Old Data
+            if (currentGeoJsonLayer) {
+                map.removeLayer(currentGeoJsonLayer);
+                currentGeoJsonLayer = null;
+            }
+
+            // 3. Implement Styling Function
+            function routeStyle(feature) {
+                return {
+                    color: feature.properties.route_color || '#808080', // Default to grey if no color
+                    weight: 5,
+                    opacity: 0.75
+                };
+            }
+
+            // 4. Implement onEachFeature Function for Popups
+            function onEachRouteFeature(feature, layer) {
+                if (feature.properties) {
+                    let popupContent = `<strong>Route: ${feature.properties.route_short_name || 'N/A'}</strong>`;
+                    if (feature.properties.route_long_name) {
+                        popupContent += `<br>${feature.properties.route_long_name}`;
+                    }
+                    if (feature.properties.route_desc) {
+                        popupContent += `<br><em>${feature.properties.route_desc}</em>`;
+                    }
+                     if (feature.properties.route_id) {
+                        popupContent += `<br><small>ID: ${feature.properties.route_id}</small>`;
+                    }
+                    layer.bindPopup(popupContent);
+                }
+            }
+
+            // 5. Create and Add GeoJSON Layer
+            if (geojson && geojson.features && geojson.features.length > 0) {
+                currentGeoJsonLayer = L.geoJSON(geojson, {
+                    style: routeStyle,
+                    onEachFeature: onEachRouteFeature
+                }).addTo(map);
+
+                // 6. Fit Map to Bounds
+                if (currentGeoJsonLayer && typeof currentGeoJsonLayer.getBounds === 'function') {
+                    const bounds = currentGeoJsonLayer.getBounds();
+                    if (bounds.isValid()) {
+                        map.fitBounds(bounds);
+                    } else {
+                        console.warn("Could not fit map to bounds: bounds are invalid.");
+                    }
+                }
+            } else {
+                console.log("No features to display on map.");
+            }
         }
     });
     </script>
