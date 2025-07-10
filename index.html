@@ -40,13 +40,14 @@
     <!-- JSZip JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
      integrity="sha512-XMVd28F1oH5MOe9HCfXDW44pnkvg6P_CgL19G9n7bC1g2fGvGg7IvO/lH3FkKkU0b8W7HwR8_Jp9Zt1KMAW/g=="
-     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+     crossorigin="anonymous"></script>
     <!-- PapaParse JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"
      integrity="sha512-dfHqKwXRXCIFJg1KzTyh3j8Ld2W02Wq3YPMU/Eop8fC_tG/j/I/GjWvKqW_Lz_U/ZgYp71H/1K6sQzI7mS/gQ=="
-     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+     crossorigin="anonymous"></script>
 
     <script>
+    document.addEventListener('DOMContentLoaded', function() {
         // Initialize Leaflet map
         const map = L.map('map').setView([51.505, -0.09], 13); // Centered on London
 
@@ -102,6 +103,7 @@
                 console.error("Error processing GTFS file:", error);
             }
         });
+    });
     </script>
 </body>
 </html>
