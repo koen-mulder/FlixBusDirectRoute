@@ -94,15 +94,102 @@
                 console.log("Parsed GTFS Data:", {
                     routes: parsedData.routes,
                     trips: parsedData.trips,
-                    shapes: parsedData.shapes
+                    routes: parsedData.routes || [],
+                    trips: parsedData.trips || [],
+                    shapes: parsedData.shapes || []
                 });
 
-                // Further processing will happen here in subsequent tasks
+                // Call processGtfsData
+                const geojsonData = await processGtfsData(parsedData.routes || [], parsedData.trips || [], parsedData.shapes || []);
+                console.log("Final GeoJSON FeatureCollection:", geojsonData);
+
 
             } catch (error) {
-                console.error("Error processing GTFS file:", error);
+                console.error("Error processing GTFS data or GeoJSON transformation:", error);
             }
         });
+
+        async function processGtfsData(routes, trips, shapes) {
+            console.log("Processing GTFS data into GeoJSON...");
+
+            // 2. Group Shape Points
+            const shapeGeometries = {};
+            if (shapes && shapes.length > 0) {
+                shapes.forEach(point => {
+                    if (!point.shape_id || point.shape_pt_lon == null || point.shape_pt_lat == null || point.shape_pt_sequence == null) {
+                        // console.warn("Skipping shape point with missing critical data:", point);
+                        return;
+                    }
+                    if (!shapeGeometries[point.shape_id]) {
+                        shapeGeometries[point.shape_id] = [];
+                    }
+                    // GeoJSON uses [lon, lat]
+                    shapeGeometries[point.shape_id].push({
+                        lon: parseFloat(point.shape_pt_lon),
+                        lat: parseFloat(point.shape_pt_lat),
+                        seq: parseInt(point.shape_pt_sequence, 10)
+                    });
+                });
+
+                // Sort points within each shape by sequence
+                for (const shapeId in shapeGeometries) {
+                    shapeGeometries[shapeId].sort((a, b) => a.seq - b.seq);
+                    // Now transform to just the coordinates array
+                    shapeGeometries[shapeId] = shapeGeometries[shapeId].map(p => [p.lon, p.lat]);
+                }
+            }
+            console.log("Shape geometries grouped and sorted:", shapeGeometries);
+
+            // 3. Map Routes to Shapes
+            const routeToShapeMap = {};
+            if (trips && trips.length > 0) {
+                trips.forEach(trip => {
+                    if (trip.route_id && trip.shape_id) {
+                        routeToShapeMap[trip.route_id] = trip.shape_id;
+                    }
+                });
+            }
+            console.log("Route to Shape Map:", routeToShapeMap);
+
+            // 4. Build the GeoJSON Features
+            const geojsonFeatures = [];
+            if (routes && routes.length > 0) {
+                routes.forEach(route => {
+                    const shapeId = routeToShapeMap[route.route_id];
+                    if (shapeId) {
+                        const coordinates = shapeGeometries[shapeId];
+                        if (coordinates && coordinates.length > 1) { // A LineString needs at least two points
+                            const feature = {
+                                type: "Feature",
+                                geometry: {
+                                    type: "LineString",
+                                    coordinates: coordinates
+                                },
+                                properties: {
+                                    route_id: route.route_id,
+                                    route_short_name: route.route_short_name,
+                                    route_long_name: route.route_long_name,
+                                    route_desc: route.route_desc,
+                                    route_type: route.route_type,
+                                    route_url: route.route_url,
+                                    route_color: route.route_color ? '#' + route.route_color : null, // Ensure # prefix for color
+                                    route_text_color: route.route_text_color ? '#' + route.route_text_color : null // Ensure # prefix
+                                }
+                            };
+                            geojsonFeatures.push(feature);
+                        } else {
+                            // console.warn(`Shape ${shapeId} for route ${route.route_id} has insufficient points.`);
+                        }
+                    } else {
+                        // console.warn(`No shape_id found for route ${route.route_id}.`);
+                    }
+                });
+            }
+            console.log("GeoJSON features built:", geojsonFeatures);
+
+            // 5. Return the Final Object
+            return { type: "FeatureCollection", features: geojsonFeatures };
+        }
     });
     </script>
 </body>
