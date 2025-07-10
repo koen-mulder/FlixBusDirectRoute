@@ -143,6 +143,21 @@
 
                 console.log("Parsed GTFS Data:", parsedData);
 
+                // Populate globalRouteDetailsMap
+                globalRouteDetailsMap = {}; // Reset for new file
+                if (parsedData.routes && parsedData.routes.length > 0) {
+                    parsedData.routes.forEach(route => {
+                        if (route.route_id) {
+                            globalRouteDetailsMap[route.route_id] = {
+                                short_name: route.route_short_name,
+                                long_name: route.route_long_name,
+                                color: route.route_color ? '#' + route.route_color : '#808080' // Default color
+                            };
+                        }
+                    });
+                }
+                console.log("Global Route Details Map populated:", globalRouteDetailsMap);
+
                 // Call processGtfsData with all parsed data
                 const processedData = await processGtfsData(
                     parsedData.routes,
@@ -346,8 +361,9 @@
 
         let currentRoutesLayer = null;
         let currentStopsLayer = null;
-        let fullRoutesGeoJson = null; // To store the unfiltered routes
-        let stopToRouteIdsData = null; // To store the map for filtering
+        let fullRoutesGeoJson = null;
+        let stopToRouteIdsData = null;
+        let globalRouteDetailsMap = {}; // To store route details by route_id
 
         function populateStopSelector(stopsGeoJson) {
             const selector = document.getElementById('stopSelector');
@@ -489,7 +505,29 @@
                             const lat = feature.geometry.coordinates[1];
                             const lon = feature.geometry.coordinates[0];
                             const stopId = feature.properties.stop_id;
-                            layer.bindPopup(`<strong>Stop: ${feature.properties.stop_name}</strong><br><small>ID: ${stopId}</small><br><button onclick="handleFromHere('${stopId}', ${lat}, ${lon})">From here</button>`);
+                            let popupContent = `<strong>Stop: ${feature.properties.stop_name}</strong><br><small>ID: ${stopId}</small>`;
+
+                            if (stopToRouteIdsData && stopToRouteIdsData[stopId] && globalRouteDetailsMap) {
+                                const routeIds = stopToRouteIdsData[stopId];
+                                if (routeIds.length > 0) {
+                                    popupContent += `<br><hr><strong>Servicing Routes:</strong><br>`;
+                                    let routesHtml = '';
+                                    routeIds.forEach(routeId => {
+                                        const routeDetail = globalRouteDetailsMap[routeId];
+                                        const routeDisplayName = routeDetail ? (routeDetail.short_name || routeId) : routeId;
+                                        const routeBgColor = routeDetail ? routeDetail.color : '#808080';
+                                        const routeTextColor = getContrastingTextColor(routeBgColor);
+
+                                        routesHtml += `<span style="background-color:${routeBgColor}; color:${routeTextColor}; padding: 2px 5px; border-radius: 3px; margin-right: 4px; font-weight:bold; display: inline-block; margin-bottom: 3px;">${routeDisplayName}</span>`;
+                                    });
+                                    popupContent += routesHtml; // No trim needed if spans handle spacing
+                                } else {
+                                    // popupContent += "<br><small>No routes directly listed for this stop.</small>";
+                                }
+                            }
+
+                            popupContent += `<br><br><button onclick="handleFromHere('${stopId}', ${lat}, ${lon})">From here</button>`; // Added <br> for spacing
+                            layer.bindPopup(popupContent);
                         }
                     }
                 }).addTo(map);
@@ -543,6 +581,28 @@
         } else {
             console.error("Stop selector not found.");
         }
+    }
+
+    // Helper function to get contrasting text color (white or black) for a given hex background
+    function getContrastingTextColor(hexColor) {
+        if (!hexColor || hexColor.length < 4) return '#000000'; // Default to black if no/invalid color
+
+        let r, g, b;
+        if (hexColor.length === 4) { // Handle shorthand hex like #RGB
+            r = parseInt(hexColor[1] + hexColor[1], 16);
+            g = parseInt(hexColor[2] + hexColor[2], 16);
+            b = parseInt(hexColor[3] + hexColor[3], 16);
+        } else if (hexColor.length === 7) { // Handle #RRGGBB
+            r = parseInt(hexColor.slice(1, 3), 16);
+            g = parseInt(hexColor.slice(3, 5), 16);
+            b = parseInt(hexColor.slice(5, 7), 16);
+        } else {
+            return '#000000'; // Invalid format
+        }
+
+        // Standard luminance calculation (YIQ)
+        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+        return (yiq >= 128) ? '#000000' : '#FFFFFF'; // Black text for light backgrounds, white for dark
     }
     </script>
 </body>
