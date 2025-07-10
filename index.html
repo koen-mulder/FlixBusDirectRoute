@@ -20,7 +20,7 @@
         input[type="file"] {
             position: absolute;
             top: 10px;
-            left: 10px;
+            left: 55px; /* Changed from 10px */
             z-index: 1000; /* Ensure it's above the map */
             padding: 10px;
             background: white;
@@ -31,7 +31,7 @@
 </head>
 <body>
     <input type="file" id="gtfsFile" accept=".zip">
-    <select id="stopSelector" style="position: absolute; top: 50px; left: 10px; z-index: 1000; padding: 5px; background: white; border: 1px solid #ccc; border-radius: 5px; max-width: 200px;">
+    <select id="stopSelector" style="position: absolute; top: 60px; left: 55px; z-index: 1000; padding: 5px; background: white; border: 1px solid #ccc; border-radius: 5px; max-width: 200px;">
         <option value="">-- Select a Stop to Filter Routes --</option>
     </select>
     <div id="map"></div>
@@ -71,9 +71,9 @@
         map.on('zoomend', function() {
             if (currentStopsLayer) {
                 const currentZoom = map.getZoom();
-                let newRadius = 5;
-                if (currentZoom < 13) {
-                    newRadius = 3;
+                let newRadius = 5; // Standard size (default for zoom < 13)
+                if (currentZoom >= 13) {
+                    newRadius = 3; // Smaller size for zoom >= 13
                 }
                 currentStopsLayer.eachLayer(function(layer) {
                     if (layer.setRadius) { // Check if it's a circleMarker
@@ -470,9 +470,9 @@
                 currentStopsLayer = L.geoJSON(stopsGeoJson, {
                     pointToLayer: function (feature, latlng) {
                         const currentZoom = map.getZoom();
-                        let radius = 5; // Default for zoom >= 13
-                        if (currentZoom < 13) {
-                            radius = 3; // Smaller for zoom < 13
+                        let radius = 5; // Standard size (default for zoom < 13)
+                        if (currentZoom >= 13) {
+                            radius = 3; // Smaller size for zoom >= 13
                         }
                         return L.circleMarker(latlng, {
                             radius: radius,
@@ -486,7 +486,10 @@
                     },
                     onEachFeature: function (feature, layer) { // Popup for stops
                         if (feature.properties && feature.properties.stop_name) {
-                            layer.bindPopup(`<strong>Stop: ${feature.properties.stop_name}</strong><br><small>ID: ${feature.properties.stop_id}</small>`);
+                            const lat = feature.geometry.coordinates[1];
+                            const lon = feature.geometry.coordinates[0];
+                            const stopId = feature.properties.stop_id;
+                            layer.bindPopup(`<strong>Stop: ${feature.properties.stop_name}</strong><br><small>ID: ${stopId}</small><br><button onclick="handleFromHere('${stopId}', ${lat}, ${lon})">From here</button>`);
                         }
                     }
                 }).addTo(map);
@@ -526,6 +529,11 @@
             }
         }
     });
+
+    function handleFromHere(stopId, lat, lon) {
+        console.log(`"From here" button clicked for Stop ID: ${stopId}, Lat: ${lat}, Lon: ${lon}`);
+        // Placeholder for future functionality
+    }
     </script>
 </body>
 </html>
