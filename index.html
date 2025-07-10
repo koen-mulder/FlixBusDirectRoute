@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GTFS Route Viewer</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+     crossorigin=""/>
+    <style>
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+        body {
+            margin: 0;
+            font-family: sans-serif;
+        }
+        input[type="file"] {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 1000; /* Ensure it's above the map */
+            padding: 10px;
+            background: white;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <input type="file" id="gtfsFile" accept=".zip">
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+     integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+     crossorigin=""></script>
+    <!-- JSZip JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"
+     integrity="sha512-XMVd28F1oH5MOe9HCfXDW44pnkvg6P_CgL19G9n7bC1g2fGvGg7IvO/lH3FkKkU0b8W7HwR8_Jp9Zt1KMAW/g=="
+     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <!-- PapaParse JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"
+     integrity="sha512-dfHqKwXRXCIFJg1KzTyh3j8Ld2W02Wq3YPMU/Eop8fC_tG/j/I/GjWvKqW_Lz_U/ZgYp71H/1K6sQzI7mS/gQ=="
+     crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
+    <script>
+        // Initialize Leaflet map
+        const map = L.map('map').setView([51.505, -0.09], 13); // Centered on London
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        // File input handling
+        const fileInput = document.getElementById('gtfsFile');
+        fileInput.addEventListener('change', async function(event) {
+            const file = event.target.files[0];
+            if (!file) {
+                console.log("No file selected.");
+                return;
+            }
+            console.log("File selected:", file.name);
+
+            try {
+                const zip = await JSZip.loadAsync(file);
+                console.log("ZIP file loaded.");
+
+                const requiredFiles = ["routes.txt", "trips.txt", "shapes.txt"];
+                const parsedData = {};
+
+                for (const fileName of requiredFiles) {
+                    const fileInZip = zip.file(fileName);
+                    if (fileInZip) {
+                        console.log(`Processing ${fileName}...`);
+                        const content = await fileInZip.async("string");
+                        const result = Papa.parse(content, {
+                            header: true,
+                            skipEmptyLines: true,
+                            dynamicTyping: true // Automatically convert numbers and booleans
+                        });
+                        parsedData[fileName.split('.')[0]] = result.data;
+                        console.log(`${fileName} parsed successfully. Found ${result.data.length} records.`);
+                    } else {
+                        console.warn(`${fileName} not found in the ZIP.`);
+                        parsedData[fileName.split('.')[0]] = []; // Ensure array exists even if file is missing
+                    }
+                }
+
+                console.log("Parsed GTFS Data:", {
+                    routes: parsedData.routes,
+                    trips: parsedData.trips,
+                    shapes: parsedData.shapes
+                });
+
+                // Further processing will happen here in subsequent tasks
+
+            } catch (error) {
+                console.error("Error processing GTFS file:", error);
+            }
+        });
+    </script>
+</body>
+</html>
