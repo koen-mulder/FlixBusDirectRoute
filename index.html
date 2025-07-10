@@ -53,9 +53,11 @@
      crossorigin="anonymous"></script>
 
     <script>
+    let map = null; // Declare map globally
+
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize Leaflet map
-        const map = L.map('map').setView([51.505, -0.09], 13); // Centered on London
+        map = L.map('map').setView([51.505, -0.09], 13); // Assign to global map
 
         // Create custom panes for layer ordering
         map.createPane('routePane');
