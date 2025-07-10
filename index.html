@@ -94,6 +94,21 @@
                 return;
             }
             console.log("File selected:", file.name);
+
+            // Reset any existing route highlighting
+            if (highlightedRouteLayer && highlightedRouteLayer.feature) {
+                // Re-apply the default style for that feature
+                // Note: routeStyle function is defined within displayGtfsDataOnMap,
+                // so it's not directly accessible here.
+                // For simplicity here, we just nullify.
+                // The old layer will be removed by displayGtfsDataOnMap,
+                // and new layers will get default styles.
+                highlightedRouteLayer = null;
+            }
+            // Also reset the main stop selector to default
+            document.getElementById('stopSelector').value = "";
+
+
             loadingPopup.textContent = 'Loading and unzipping file...';
             loadingPopup.style.display = 'block';
             document.body.style.cursor = 'wait'; // Show wait cursor
@@ -363,7 +378,21 @@
         let currentStopsLayer = null;
         let fullRoutesGeoJson = null;
         let stopToRouteIdsData = null;
-        let globalRouteDetailsMap = {}; // To store route details by route_id
+        let globalRouteDetailsMap = {};
+        let highlightedRouteLayer = null;
+
+    // Moved routeStyle to be accessible globally for resetting styles
+    function routeStyle(feature) {
+        if (!feature || !feature.properties) return { color: '#808080', weight: 5, opacity: 0.75 }; // Fallback
+        // Use globalRouteDetailsMap if direct feature.properties.route_color is not the source of truth after parsing
+        const routeDetails = globalRouteDetailsMap[feature.properties.route_id];
+        const color = routeDetails ? routeDetails.color : (feature.properties.route_color ? '#' + feature.properties.route_color : '#808080');
+        return {
+            color: color,
+            weight: 5,
+            opacity: 0.75
+        };
+    }
 
         function populateStopSelector(stopsGeoJson) {
             const selector = document.getElementById('stopSelector');
@@ -397,6 +426,14 @@
         document.getElementById('stopSelector').addEventListener('change', function(event) {
             const selectedStopId = event.target.value;
             console.log(`Filtering by selectedStopId: '${selectedStopId}' (type: ${typeof selectedStopId})`);
+
+            // Reset any existing route highlighting when main filter changes
+            if (highlightedRouteLayer && highlightedRouteLayer.feature) {
+                // When the main filter changes, the currentRoutesLayer is cleared and redrawn
+                // by displayGtfsDataOnMap, which will apply the default routeStyle.
+                // So, just nullifying highlightedRouteLayer is sufficient.
+                highlightedRouteLayer = null;
+            }
 
             if (!fullRoutesGeoJson || !stopToRouteIdsData) {
                 console.warn("Data not fully loaded yet for filtering (fullRoutesGeoJson or stopToRouteIdsData is missing).");
@@ -444,14 +481,7 @@
                 }
             }
 
-            // Styling for Routes
-            function routeStyle(feature) {
-                return {
-                    color: feature.properties.route_color || '#808080', // Default to grey if no color
-                    weight: 5,
-                    opacity: 0.75
-                };
-            }
+            // Styling for Routes is now a global function: routeStyle(feature)
 
             // 4. Implement onEachFeature Function for Popups
             function onEachRouteFeature(feature, layer) {
@@ -518,15 +548,15 @@
                                         const routeBgColor = routeDetail ? routeDetail.color : '#808080';
                                         const routeTextColor = getContrastingTextColor(routeBgColor);
 
-                                        routesHtml += `<span style="background-color:${routeBgColor}; color:${routeTextColor}; padding: 2px 5px; border-radius: 3px; margin-right: 4px; font-weight:bold; display: inline-block; margin-bottom: 3px;">${routeDisplayName}</span>`;
+                                        routesHtml += `<span class="route-badge" onclick="handleRouteBadgeClick('${routeId}')" style="background-color:${routeBgColor}; color:${routeTextColor}; padding: 2px 5px; border-radius: 3px; margin-right: 4px; font-weight:bold; display: inline-block; margin-bottom: 3px; cursor:pointer;">${routeDisplayName}</span>`;
                                     });
-                                    popupContent += routesHtml; // No trim needed if spans handle spacing
+                                    popupContent += routesHtml;
                                 } else {
                                     // popupContent += "<br><small>No routes directly listed for this stop.</small>";
                                 }
                             }
 
-                            popupContent += `<br><br><button onclick="handleFromHere('${stopId}', ${lat}, ${lon})">From here</button>`; // Added <br> for spacing
+                            popupContent += `<br><br><button onclick="handleFromHere('${stopId}', ${lat}, ${lon})">Show all routes from here</button>`; // Changed text
                             layer.bindPopup(popupContent);
                         }
                     }
@@ -603,6 +633,32 @@
         // Standard luminance calculation (YIQ)
         const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
         return (yiq >= 128) ? '#000000' : '#FFFFFF'; // Black text for light backgrounds, white for dark
+    }
+
+    function handleRouteBadgeClick(routeId) {
+        console.log("Route badge clicked for routeId:", routeId);
+
+        // Unhighlight previously highlighted route
+        if (highlightedRouteLayer && highlightedRouteLayer.feature) {
+            // Re-apply the default style for that feature using the global routeStyle
+            highlightedRouteLayer.setStyle(routeStyle(highlightedRouteLayer.feature));
+            highlightedRouteLayer = null;
+        }
+
+        if (!currentRoutesLayer) return;
+
+        // Find and highlight the new route
+        currentRoutesLayer.eachLayer(function(layer) {
+            if (layer.feature && layer.feature.properties && layer.feature.properties.route_id === routeId) {
+                // No need to store original style anymore, it will be re-calculated by routeStyle
+                layer.setStyle({ color: '#FF0000', weight: 7, opacity: 1.0 });
+                highlightedRouteLayer = layer; // Set this as the currently highlighted one
+                layer.bringToFront();
+                // map.fitBounds(layer.getBounds()); // Optional: zoom to selected route
+                return; // Exit eachLayer loop
+            }
+        });
+        map.closePopup(); // Close the popup after selection
     }
     </script>
 </body>
