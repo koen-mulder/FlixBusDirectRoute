@@ -74,12 +74,13 @@
             }
             console.log("File selected:", file.name);
             loadingPopup.textContent = 'Loading and unzipping file...';
-            loadingPopup.style.display = 'block'; // Show loading popup
+            loadingPopup.style.display = 'block';
+            document.body.style.cursor = 'wait'; // Show wait cursor
 
             try {
                 const zip = await JSZip.loadAsync(file);
                 console.log("ZIP file loaded.");
-                loadingPopup.textContent = 'Parsing GTFS data files...';
+                loadingPopup.textContent = 'Parsing GTFS data files...'; // General message before detailed loop
 
                 const requiredFiles = ["routes.txt", "trips.txt", "shapes.txt", "stops.txt", "stop_times.txt"];
                 const parsedData = {
@@ -90,11 +91,16 @@
                     stopTimes: []
                 };
 
-                for (const fileName of requiredFiles) {
-                    const fileKey = fileName.split('.')[0].replace('_', ''); // e.g., stop_times -> stopTimes
+                for (let i = 0; i < requiredFiles.length; i++) {
+                    const fileName = requiredFiles[i];
+                    const fileKey = fileName.split('.')[0].replace('_', '');
+                    loadingPopup.textContent = `Parsing ${fileName} (${i + 1} of ${requiredFiles.length})...`;
+
                     const fileInZip = zip.file(fileName);
                     if (fileInZip) {
                         console.log(`Processing ${fileName}...`);
+                        // Small delay to make text update visible, helpful for very fast parsing
+                        // await new Promise(resolve => setTimeout(resolve, 50));
                         const content = await fileInZip.async("string");
                         const result = Papa.parse(content, {
                             header: true,
@@ -136,7 +142,8 @@
             } catch (error) {
                 console.error("Error processing data or displaying on map:", error);
             } finally {
-                loadingPopup.style.display = 'none'; // Hide loading popup
+                loadingPopup.style.display = 'none';
+                document.body.style.cursor = 'default'; // Reset cursor
             }
         });
 
@@ -202,11 +209,29 @@
                     }
                 });
             }
-            // Convert Sets to Arrays for easier use later, if needed, or keep as Sets
+            // console.log("Debug: tripToRouteMap", JSON.parse(JSON.stringify(tripToRouteMap))); // For deep copy logging if needed
+
+            if (stopTimes && stopTimes.length > 0) {
+                stopTimes.forEach(stopTime => {
+                    if (stopTime.trip_id && stopTime.stop_id) {
+                        const routeId = tripToRouteMap[stopTime.trip_id];
+                        if (routeId) {
+                            if (!stopToRouteIdsMap[stopTime.stop_id]) {
+                                stopToRouteIdsMap[stopTime.stop_id] = new Set();
+                            }
+                            stopToRouteIdsMap[stopTime.stop_id].add(routeId);
+                        } else {
+                            // console.warn(`Debug: No route_id found for trip_id '${stopTime.trip_id}' in stop_time for stop_id '${stopTime.stop_id}'.`);
+                        }
+                    }
+                });
+            }
+            // Convert Sets to Arrays
             for (const stopId in stopToRouteIdsMap) {
                 stopToRouteIdsMap[stopId] = Array.from(stopToRouteIdsMap[stopId]);
             }
-            console.log("Stop to Route IDs Map:", stopToRouteIdsMap);
+            console.log("Stop to Route IDs Map (after processing):", stopToRouteIdsMap);
+            // console.log("Debug: stopToRouteIdsMap final", JSON.parse(JSON.stringify(stopToRouteIdsMap)));
 
 
             // Existing: 2. Group Shape Points
@@ -329,27 +354,33 @@
         // Event listener for stop selector
         document.getElementById('stopSelector').addEventListener('change', function(event) {
             const selectedStopId = event.target.value;
+            console.log(`Filtering by selectedStopId: '${selectedStopId}' (type: ${typeof selectedStopId})`);
 
             if (!fullRoutesGeoJson || !stopToRouteIdsData) {
-                console.warn("Data not fully loaded yet for filtering.");
+                console.warn("Data not fully loaded yet for filtering (fullRoutesGeoJson or stopToRouteIdsData is missing).");
                 return;
             }
 
             if (selectedStopId) {
                 const routeIdsForStop = stopToRouteIdsData[selectedStopId];
+                console.log(`Route IDs found for stop '${selectedStopId}':`, routeIdsForStop);
+
                 if (routeIdsForStop && routeIdsForStop.length > 0) {
-                    const filteredFeatures = fullRoutesGeoJson.features.filter(feature =>
-                        routeIdsForStop.includes(feature.properties.route_id)
-                    );
+                    const filteredFeatures = fullRoutesGeoJson.features.filter(feature => {
+                        const include = routeIdsForStop.includes(feature.properties.route_id);
+                        // console.log(`Route ${feature.properties.route_id} included: ${include}`);
+                        return include;
+                    });
+                    console.log("Filtered features:", filteredFeatures);
                     const filteredRoutes = { type: "FeatureCollection", features: filteredFeatures };
-                    displayGtfsDataOnMap(filteredRoutes, null); // Display filtered routes, don't re-process stopsGeoJson here
-                                                              // We might want to pass the original stopsGeoJson if we want to highlight the selected stop
+                    displayGtfsDataOnMap(filteredRoutes, null);
                 } else {
-                    console.log(`No routes found for stop ${selectedStopId}. Displaying no routes.`);
-                    displayGtfsDataOnMap({ type: "FeatureCollection", features: [] }, null); // Display no routes
+                    console.log(`No routes found for stop '${selectedStopId}' in stopToRouteIdsData or list is empty. Displaying no routes.`);
+                    displayGtfsDataOnMap({ type: "FeatureCollection", features: [] }, null);
                 }
             } else {
                 // No stop selected (or "-- Select --" chosen), display all routes
+                console.log("No stop selected, displaying all routes.");
                 displayGtfsDataOnMap(fullRoutesGeoJson, null); // Display all routes
             }
         });
