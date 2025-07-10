@@ -53,7 +53,13 @@
      crossorigin="anonymous"></script>
 
     <script>
-    let map = null; // Declare map globally
+    let map = null;
+    window.currentRoutesLayer = null;
+    window.currentStopsLayer = null;
+    let fullRoutesGeoJson = null;
+    let stopToRouteIdsData = null;
+    window.globalRouteDetailsMap = {}; // Explicitly global
+    window.highlightedRouteLayer = null;
 
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize Leaflet map
@@ -71,7 +77,7 @@
         }).addTo(map);
 
         map.on('zoomend', function() {
-            if (currentStopsLayer) {
+            if (window.currentStopsLayer) { // Use window.currentStopsLayer
                 const currentZoom = map.getZoom();
                 let newRadius = 5; // Standard size (default for zoom < 13)
                 if (currentZoom >= 13) {
@@ -161,11 +167,11 @@
                 console.log("Parsed GTFS Data:", parsedData);
 
                 // Populate globalRouteDetailsMap
-                globalRouteDetailsMap = {}; // Reset for new file
+                window.globalRouteDetailsMap = {}; // Reset for new file
                 if (parsedData.routes && parsedData.routes.length > 0) {
                     parsedData.routes.forEach(route => {
                         if (route.route_id) {
-                            globalRouteDetailsMap[route.route_id] = {
+                            window.globalRouteDetailsMap[route.route_id] = {
                                 short_name: route.route_short_name,
                                 long_name: route.route_long_name,
                                 color: route.route_color ? '#' + route.route_color : '#808080' // Default color
@@ -173,7 +179,7 @@
                         }
                     });
                 }
-                console.log("Global Route Details Map populated:", globalRouteDetailsMap);
+                console.log("Global Route Details Map populated:", window.globalRouteDetailsMap);
 
                 // Call processGtfsData with all parsed data
                 const processedData = await processGtfsData(
@@ -386,8 +392,8 @@
     // Moved routeStyle to be accessible globally for resetting styles
     function routeStyle(feature) {
         if (!feature || !feature.properties) return { color: '#808080', weight: 5, opacity: 0.75 }; // Fallback
-        // Use globalRouteDetailsMap if direct feature.properties.route_color is not the source of truth after parsing
-        const routeDetails = globalRouteDetailsMap[feature.properties.route_id];
+        // Use window.globalRouteDetailsMap if direct feature.properties.route_color is not the source of truth after parsing
+        const routeDetails = window.globalRouteDetailsMap[feature.properties.route_id];
         const color = routeDetails ? routeDetails.color : (feature.properties.route_color ? '#' + feature.properties.route_color : '#808080');
         return {
             color: color,
@@ -470,16 +476,16 @@
             console.log("Displaying GTFS data on map...");
 
             // Clear Old Route Data
-            if (currentRoutesLayer) {
-                map.removeLayer(currentRoutesLayer);
-                currentRoutesLayer = null;
+            if (window.currentRoutesLayer) {
+                map.removeLayer(window.currentRoutesLayer);
+                window.currentRoutesLayer = null;
             }
 
             // Only clear and re-add stops if stopsGeoJson is provided (i.e., initial load)
             if (stopsGeoJson !== undefined && stopsGeoJson !== null) { // Check specifically for undefined/null
-                if (currentStopsLayer) {
-                    map.removeLayer(currentStopsLayer);
-                    currentStopsLayer = null;
+                if (window.currentStopsLayer) { // Using window.currentStopsLayer
+                    map.removeLayer(window.currentStopsLayer);
+                    window.currentStopsLayer = null;
                 }
             }
 
@@ -504,7 +510,7 @@
 
             // Create and Add Routes Layer
             if (routesGeoJson && routesGeoJson.features && routesGeoJson.features.length > 0) {
-                currentRoutesLayer = L.geoJSON(routesGeoJson, {
+                window.currentRoutesLayer = L.geoJSON(routesGeoJson, { // Assign to window.currentRoutesLayer
                     style: routeStyle,
                     onEachFeature: onEachRouteFeature,
                     pane: 'routePane' // Assign to routePane
@@ -515,7 +521,7 @@
 
             // Create and Add Stops Layer (only if stopsGeoJson is provided)
             if (stopsGeoJson && stopsGeoJson.features && stopsGeoJson.features.length > 0) {
-                currentStopsLayer = L.geoJSON(stopsGeoJson, {
+                window.currentStopsLayer = L.geoJSON(stopsGeoJson, { // Assign to window.currentStopsLayer
                     pointToLayer: function (feature, latlng) {
                         const currentZoom = map.getZoom();
                         let radius = 5; // Standard size (default for zoom < 13)
@@ -539,13 +545,13 @@
                             const stopId = feature.properties.stop_id;
                             let popupContent = `<strong>Stop: ${feature.properties.stop_name}</strong><br><small>ID: ${stopId}</small>`;
 
-                            if (stopToRouteIdsData && stopToRouteIdsData[stopId] && globalRouteDetailsMap) {
+                            if (stopToRouteIdsData && stopToRouteIdsData[stopId] && window.globalRouteDetailsMap) { // Use window.globalRouteDetailsMap
                                 const routeIds = stopToRouteIdsData[stopId];
                                 if (routeIds.length > 0) {
                                     popupContent += `<br><hr><strong>Servicing Routes:</strong><br>`;
                                     let routesHtml = '';
                                     routeIds.forEach(routeId => {
-                                        const routeDetail = globalRouteDetailsMap[routeId];
+                                        const routeDetail = window.globalRouteDetailsMap[routeId]; // Use window.globalRouteDetailsMap
                                         const routeDisplayName = routeDetail ? (routeDetail.short_name || routeId) : routeId;
                                         const routeBgColor = routeDetail ? routeDetail.color : '#808080';
                                         const routeTextColor = getContrastingTextColor(routeBgColor);
@@ -648,13 +654,13 @@
             window.highlightedRouteLayer = null;
         }
 
-        if (!currentRoutesLayer) { // currentRoutesLayer is already a global 'let' variable
-            console.warn("currentRoutesLayer is not available in handleRouteBadgeClick");
+        if (!window.currentRoutesLayer) { // Check window.currentRoutesLayer
+            console.warn("window.currentRoutesLayer is not available in handleRouteBadgeClick");
             return;
         }
 
         // Find and highlight the new route
-        currentRoutesLayer.eachLayer(function(layer) {
+        window.currentRoutesLayer.eachLayer(function(layer) { // Iterate window.currentRoutesLayer
             if (layer.feature && layer.feature.properties && layer.feature.properties.route_id === routeId) {
                 // No need to store original style anymore, it will be re-calculated by routeStyle
                 layer.setStyle({ color: '#FF0000', weight: 7, opacity: 1.0 });
