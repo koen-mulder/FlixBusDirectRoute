@@ -77,21 +77,19 @@
         }).addTo(map);
 
         map.on('zoomend', function() {
-            console.log('Zoomend event. typeof window.currentStopsLayer:', typeof window.currentStopsLayer, '; Value:', window.currentStopsLayer);
             if (window.currentStopsLayer && typeof window.currentStopsLayer.eachLayer === 'function') {
-                console.log('Zoomend: Updating stop radii.');
                 const currentZoom = map.getZoom();
-                let newRadius = 5; // Standard size (default for zoom < 13)
+                let newRadius = 5;
                 if (currentZoom >= 13) {
-                    newRadius = 3; // Smaller size for zoom >= 13
+                    newRadius = 3;
                 }
-                currentStopsLayer.eachLayer(function(layer) {
-                    if (layer.setRadius) { // Check if it's a circleMarker
+                window.currentStopsLayer.eachLayer(function(layer) {
+                    if (layer.setRadius) {
                         layer.setRadius(newRadius);
                     }
                 });
             } else {
-                console.log('Zoomend: Skipping stop radii update (currentStopsLayer invalid or no eachLayer method).');
+                // console.log('Zoomend: Skipping stop radii update (currentStopsLayer invalid or no eachLayer method).'); // Optional
             }
         });
 
@@ -578,34 +576,36 @@
             }
 
             // Fit Map to Bounds
-            let boundsToFit = null;
-            if (routesGeoJson && routesGeoJson.features && routesGeoJson.features.length > 0) {
-                // If there are routes, get their bounds
-                const tempRoutesLayer = L.geoJSON(routesGeoJson);
-                boundsToFit = tempRoutesLayer.getBounds();
-            }
+            let boundsToFit = L.latLngBounds();
+            let hasFeaturesToFit = false;
 
-            if (stopsGeoJson && stopsGeoJson.features && stopsGeoJson.features.length > 0) {
-                // If stops are also being loaded/updated, extend bounds to include them
-                const tempStopsLayer = L.geoJSON(stopsGeoJson);
-                if (boundsToFit) {
-                    boundsToFit.extend(tempStopsLayer.getBounds());
-                } else {
-                    boundsToFit = tempStopsLayer.getBounds();
+            if (window.currentRoutesLayer && typeof window.currentRoutesLayer.getBounds === 'function') {
+                // Check if the layer actually has layers itself before getting bounds
+                if (Object.keys(window.currentRoutesLayer._layers).length > 0) {
+                     const routeBounds = window.currentRoutesLayer.getBounds();
+                    if (routeBounds.isValid()) {
+                        boundsToFit.extend(routeBounds);
+                        hasFeaturesToFit = true;
+                    }
                 }
             }
 
-            if (boundsToFit && boundsToFit.isValid()) {
-                map.fitBounds(boundsToFit);
-            } else if (routesGeoJson && routesGeoJson.features && routesGeoJson.features.length === 0) {
-                // If routes are explicitly empty (e.g. after filtering, no routes for a stop),
-                // do nothing with bounds, map stays as is. Or potentially reset to a default view.
-                // For now, doing nothing is fine.
-                console.log("No routes to fit bounds to, map view unchanged.");
-            } else if (!boundsToFit) {
-                 console.log("No features to calculate bounds from.");
-            } else if (boundsToFit && !boundsToFit.isValid()){
-                 console.warn("Could not fit map to bounds: calculated bounds are invalid.");
+            // Only extend with stops if stopsGeoJson was provided in this call (meaning they were newly added/updated)
+            // AND currentStopsLayer was successfully created and has features.
+            if (stopsGeoJson && window.currentStopsLayer && typeof window.currentStopsLayer.getBounds === 'function') {
+                if (Object.keys(window.currentStopsLayer._layers).length > 0) {
+                    const stopBounds = window.currentStopsLayer.getBounds();
+                    if (stopBounds.isValid()) {
+                        boundsToFit.extend(stopBounds);
+                        hasFeaturesToFit = true;
+                    }
+                }
+            }
+
+            if (hasFeaturesToFit && boundsToFit.isValid()) {
+                map.fitBounds(boundsToFit); // Re-enabled
+            } else {
+                console.log("Skipping map.fitBounds: No valid features/bounds to fit. Map view remains.");
             }
         }
     });
