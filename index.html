@@ -77,7 +77,9 @@
         }).addTo(map);
 
         map.on('zoomend', function() {
-            if (window.currentStopsLayer) { // Use window.currentStopsLayer
+            console.log('Zoomend event. typeof window.currentStopsLayer:', typeof window.currentStopsLayer, '; Value:', window.currentStopsLayer);
+            if (window.currentStopsLayer && typeof window.currentStopsLayer.eachLayer === 'function') {
+                console.log('Zoomend: Updating stop radii.');
                 const currentZoom = map.getZoom();
                 let newRadius = 5; // Standard size (default for zoom < 13)
                 if (currentZoom >= 13) {
@@ -88,6 +90,8 @@
                         layer.setRadius(newRadius);
                     }
                 });
+            } else {
+                console.log('Zoomend: Skipping stop radii update (currentStopsLayer invalid or no eachLayer method).');
             }
         });
 
