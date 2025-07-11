@@ -52,6 +52,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"
      integrity="sha512-dfX5uYVXzyU8+KHqj8bjo7UkOdg18PaOtpa48djpNbZHwExddghZ+ZmzWT06R5v6NSk3ZUfsH6FNEDepLx9hPQ=="
      crossorigin="anonymous"></script>
+    <!-- simplify-js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplify-js/1.2.4/simplify.min.js"></script>
 
     <script>
     let map = null;
@@ -92,23 +94,6 @@
             maxZoom: 19,
             attribution: '© OpenStreetMap contributors'
         }).addTo(map);
-
-        map.on('zoomend', function() {
-            if (window.currentStopsLayer && typeof window.currentStopsLayer.eachLayer === 'function') {
-                const currentZoom = map.getZoom();
-                let newRadius = 5;
-                if (currentZoom >= 13) {
-                    newRadius = 3;
-                }
-                window.currentStopsLayer.eachLayer(function(layer) {
-                    if (layer.setRadius) {
-                        layer.setRadius(newRadius);
-                    }
-                });
-            } else {
-                // console.log('Zoomend: Skipping stop radii update (currentStopsLayer invalid or no eachLayer method).'); // Optional
-            }
-        });
 
         // File input handling
         const fileInput = document.getElementById('gtfsFile');
@@ -332,10 +317,21 @@
                 for (const shapeId in shapeGeometries) {
                     shapeGeometries[shapeId].sort((a, b) => a.seq - b.seq);
                     // Now transform to just the coordinates array
-                    shapeGeometries[shapeId] = shapeGeometries[shapeId].map(p => [p.lon, p.lat]);
+                    let points = shapeGeometries[shapeId].map(p => ({ x: p.lon, y: p.lat }));
+
+                    // Simplify the points
+                    // Tolerance is a critical parameter; 0.0001 is a starting value for lat/lon degrees.
+                    // Higher tolerance = more simplification = fewer points.
+                    // highQuality: false for faster simplification.
+                    const tolerance = 0.0001; // Adjust as needed
+                    const highQuality = false;
+                    let simplifiedPoints = simplify(points, tolerance, highQuality);
+
+                    // Convert back to [lon, lat] format for GeoJSON
+                    shapeGeometries[shapeId] = simplifiedPoints.map(p => [p.x, p.y]);
                 }
             }
-            console.log("Shape geometries grouped and sorted:", shapeGeometries);
+            console.log("Shape geometries grouped, sorted, and simplified:", shapeGeometries);
 
             // 3. Map Routes to Shapes
             const routeToShapeMap = {};
@@ -529,13 +525,14 @@
             if (stopsGeoJson && stopsGeoJson.features && stopsGeoJson.features.length > 0) {
                 window.currentStopsLayer = L.geoJSON(stopsGeoJson, { // Assign to window.currentStopsLayer
                     pointToLayer: function (feature, latlng) {
-                        const currentZoom = map.getZoom();
-                        let radius = 5; // Standard size (default for zoom < 13)
-                        if (currentZoom >= 13) {
-                            radius = 3; // Smaller size for zoom >= 13
-                        }
+                        // const currentZoom = map.getZoom(); // No longer needed for radius
+                        // let radius = 5; // Standard size (default for zoom < 13)
+                        // if (currentZoom >= 13) {
+                        //     radius = 3; // Smaller size for zoom >= 13
+                        // }
+                        const fixedRadius = 4; // Use a fixed radius
                         return L.circleMarker(latlng, {
-                            radius: radius,
+                            radius: fixedRadius, // Use fixed radius
                             fillColor: "pink",
                             color: "#000",
                             weight: 1,
