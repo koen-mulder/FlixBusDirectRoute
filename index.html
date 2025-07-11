@@ -64,6 +64,20 @@
     window.globalRouteDetailsMap = {}; // Explicitly global
     window.highlightedRouteLayer = null;
 
+    // Moved routeStyle to be accessible globally for resetting styles
+    function routeStyle(feature) {
+        if (!feature || !feature.properties) return { color: '#808080', weight: 5, opacity: 0.75 }; // Fallback
+        // Use window.globalRouteDetailsMap if direct feature.properties.route_color is not the source of truth after parsing
+        const routeDetails = window.globalRouteDetailsMap[feature.properties.route_id];
+        // feature.properties.route_color already includes '#' from processing step
+        const color = routeDetails ? routeDetails.color : (feature.properties.route_color ? feature.properties.route_color : '#808080');
+        return {
+            color: color,
+            weight: 5,
+            opacity: 0.75
+        };
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize Leaflet map
         map = L.map('map').setView([51.505, -0.09], 13); // Assign to global map
@@ -405,20 +419,6 @@
         // let stopToRouteIdsData = null;
         // let globalRouteDetailsMap = {};
         // window.highlightedRouteLayer = null; // This one was already correctly global
-
-    // Moved routeStyle to be accessible globally for resetting styles
-    function routeStyle(feature) {
-        if (!feature || !feature.properties) return { color: '#808080', weight: 5, opacity: 0.75 }; // Fallback
-        // Use window.globalRouteDetailsMap if direct feature.properties.route_color is not the source of truth after parsing
-        const routeDetails = window.globalRouteDetailsMap[feature.properties.route_id];
-        // feature.properties.route_color already includes '#' from processing step
-        const color = routeDetails ? routeDetails.color : (feature.properties.route_color ? feature.properties.route_color : '#808080');
-        return {
-            color: color,
-            weight: 5,
-            opacity: 0.75
-        };
-    }
 
         function populateStopSelector(stopsGeoJson) {
             const selector = document.getElementById('stopSelector');
