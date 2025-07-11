@@ -30,7 +30,8 @@
     </style>
 </head>
 <body>
-    <input type="file" id="gtfsFile" accept=".zip">
+    <label for="gtfsFile" style="position: absolute; top: 10px; left: 10px; z-index: 1000; background: white; padding: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.8em;">Upload GTFS:</label>
+    <input type="file" id="gtfsFile" accept=".zip" style="position: absolute; top: 10px; left: 120px; z-index: 1000; padding: 5px; background: white; border: 1px solid #ccc; border-radius: 5px; font-size: 0.8em;">
     <select id="stopSelector" style="position: absolute; top: 60px; left: 55px; z-index: 1000; padding: 5px; background: white; border: 1px solid #ccc; border-radius: 5px; max-width: 200px;">
         <option value="">-- Select a Stop to Filter Routes --</option>
     </select>
@@ -54,10 +55,12 @@
 
     <script>
     let map = null;
+    // Ensure these are consistently accessed via window object if they are intended to be global.
+    // The declarations within DOMContentLoaded were shadowing these.
     window.currentRoutesLayer = null;
     window.currentStopsLayer = null;
-    let fullRoutesGeoJson = null;
-    let stopToRouteIdsData = null;
+    window.fullRoutesGeoJson = null; // Changed from let to window.
+    window.stopToRouteIdsData = null; // Changed from let to window.
     window.globalRouteDetailsMap = {}; // Explicitly global
     window.highlightedRouteLayer = null;
 
@@ -143,7 +146,7 @@
                     if (fileName === "stop_times.txt") {
                         fileKey = "stopTimes"; // Explicitly set to camelCase for stop_times
                     } else {
-                        fileKey = fileKey.replace('_', ''); // Handle other potential cases like 'route_types' if added later
+                        fileKey = fileKey.replace(/_/g, ''); // Replaces all underscores
                     }
                     loadingPopup.textContent = `Parsing ${fileName} (${i + 1} of ${requiredFiles.length})...`;
 
@@ -196,8 +199,8 @@
 
                 // Store data for potential filtering and display
                 if (processedData) {
-                    fullRoutesGeoJson = processedData.routesGeoJson; // Store for reset
-                    stopToRouteIdsData = processedData.stopToRouteIdsMap;
+                    window.fullRoutesGeoJson = processedData.routesGeoJson; // Store for reset
+                    window.stopToRouteIdsData = processedData.stopToRouteIdsMap;
                     // Initial display of all routes and stops
                     displayGtfsDataOnMap(processedData.routesGeoJson, processedData.stopsGeoJson);
                     // Populate stop selector
@@ -384,19 +387,22 @@
             };
         }
 
-        let currentRoutesLayer = null;
-        let currentStopsLayer = null;
-        let fullRoutesGeoJson = null;
-        let stopToRouteIdsData = null;
-        let globalRouteDetailsMap = {};
-        window.highlightedRouteLayer = null; // Explicitly global via window object
+        // These variables were re-declared here, shadowing the global ones.
+        // They have been removed as the global ones (window.currentRoutesLayer, etc.) should be used.
+        // let currentRoutesLayer = null;
+        // let currentStopsLayer = null;
+        // let fullRoutesGeoJson = null;
+        // let stopToRouteIdsData = null;
+        // let globalRouteDetailsMap = {};
+        // window.highlightedRouteLayer = null; // This one was already correctly global
 
     // Moved routeStyle to be accessible globally for resetting styles
     function routeStyle(feature) {
         if (!feature || !feature.properties) return { color: '#808080', weight: 5, opacity: 0.75 }; // Fallback
         // Use window.globalRouteDetailsMap if direct feature.properties.route_color is not the source of truth after parsing
         const routeDetails = window.globalRouteDetailsMap[feature.properties.route_id];
-        const color = routeDetails ? routeDetails.color : (feature.properties.route_color ? '#' + feature.properties.route_color : '#808080');
+        // feature.properties.route_color already includes '#' from processing step
+        const color = routeDetails ? routeDetails.color : (feature.properties.route_color ? feature.properties.route_color : '#808080');
         return {
             color: color,
             weight: 5,
@@ -438,24 +444,24 @@
             console.log(`Filtering by selectedStopId: '${selectedStopId}' (type: ${typeof selectedStopId})`);
 
             // Reset any existing route highlighting when main filter changes
-            if (highlightedRouteLayer && highlightedRouteLayer.feature) {
+            if (window.highlightedRouteLayer && window.highlightedRouteLayer.feature) { // Use window.
                 // When the main filter changes, the currentRoutesLayer is cleared and redrawn
                 // by displayGtfsDataOnMap, which will apply the default routeStyle.
                 // So, just nullifying highlightedRouteLayer is sufficient.
                 window.highlightedRouteLayer = null;
             }
 
-            if (!fullRoutesGeoJson || !stopToRouteIdsData) {
+            if (!window.fullRoutesGeoJson || !window.stopToRouteIdsData) { // Use window.
                 console.warn("Data not fully loaded yet for filtering (fullRoutesGeoJson or stopToRouteIdsData is missing).");
                 return;
             }
 
             if (selectedStopId) {
-                const routeIdsForStop = stopToRouteIdsData[selectedStopId];
+                const routeIdsForStop = window.stopToRouteIdsData[selectedStopId]; // Use window.
                 console.log(`Route IDs found for stop '${selectedStopId}':`, routeIdsForStop);
 
                 if (routeIdsForStop && routeIdsForStop.length > 0) {
-                    const filteredFeatures = fullRoutesGeoJson.features.filter(feature => {
+                    const filteredFeatures = window.fullRoutesGeoJson.features.filter(feature => { // Use window.
                         const include = routeIdsForStop.includes(feature.properties.route_id);
                         // console.log(`Route ${feature.properties.route_id} included: ${include}`);
                         return include;
@@ -470,7 +476,7 @@
             } else {
                 // No stop selected (or "-- Select --" chosen), display all routes
                 console.log("No stop selected, displaying all routes.");
-                displayGtfsDataOnMap(fullRoutesGeoJson, null); // Display all routes
+                displayGtfsDataOnMap(window.fullRoutesGeoJson, null); // Display all routes // Use window.
             }
         });
 
@@ -547,8 +553,8 @@
                             const stopId = feature.properties.stop_id;
                             let popupContent = `<strong>Stop: ${feature.properties.stop_name}</strong><br><small>ID: ${stopId}</small>`;
 
-                            if (stopToRouteIdsData && stopToRouteIdsData[stopId] && window.globalRouteDetailsMap) { // Use window.globalRouteDetailsMap
-                                const routeIds = stopToRouteIdsData[stopId];
+                            if (window.stopToRouteIdsData && window.stopToRouteIdsData[stopId] && window.globalRouteDetailsMap) { // Use window.
+                                const routeIds = window.stopToRouteIdsData[stopId]; // Use window.
                                 if (routeIds.length > 0) {
                                     popupContent += `<br><hr><strong>Servicing Routes:</strong><br>`;
                                     let routesHtml = '';
@@ -558,7 +564,7 @@
                                         const routeBgColor = routeDetail ? routeDetail.color : '#808080';
                                         const routeTextColor = getContrastingTextColor(routeBgColor);
 
-                                        routesHtml += `<span class="route-badge" onclick="handleRouteBadgeClick('${routeId}')" style="background-color:${routeBgColor}; color:${routeTextColor}; padding: 2px 5px; border-radius: 3px; margin-right: 4px; font-weight:bold; display: inline-block; margin-bottom: 3px; cursor:pointer;">${routeDisplayName}</span>`;
+                                        routesHtml += `<span class="route-badge" data-route-id="${routeId}" style="background-color:${routeBgColor}; color:${routeTextColor}; padding: 2px 5px; border-radius: 3px; margin-right: 4px; font-weight:bold; display: inline-block; margin-bottom: 3px; cursor:pointer;">${routeDisplayName}</span>`;
                                     });
                                     popupContent += routesHtml;
                                 } else {
@@ -568,6 +574,18 @@
 
                             popupContent += `<br><br><button onclick="handleFromHere('${stopId}', ${lat}, ${lon})">Show all routes from here</button>`; // Changed text
                             layer.bindPopup(popupContent);
+
+                            // Add event listeners to route badges after popup is opened
+                            layer.on('popupopen', function () {
+                                const popupNode = this.getPopup().getElement();
+                                const badges = popupNode.querySelectorAll('.route-badge[data-route-id]');
+                                badges.forEach(badge => {
+                                    badge.addEventListener('click', function() {
+                                        const routeId = this.dataset.routeId;
+                                        handleRouteBadgeClick(routeId);
+                                    });
+                                });
+                            });
                         }
                     }
                 }).addTo(map);

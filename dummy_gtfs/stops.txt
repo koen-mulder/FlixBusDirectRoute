@@ -1,0 +1,5 @@
+stop_id,stop_name,stop_lat,stop_lon
+S1,Main Street Station,34.0522,-118.2437
+S2,City Hall Stop,34.0530,-118.2420
+S3,Park View,34.0545,-118.2400
+S4,Downtown Square,34.0500,-118.2455
