@@ -62,7 +62,21 @@
     window.fullRoutesGeoJson = null; // Changed from let to window.
     window.stopToRouteIdsData = null; // Changed from let to window.
     window.globalRouteDetailsMap = {}; // Explicitly global
-    window.highlightedRouteLayer = null;
+    window.highlightedRouteId = null; // Stores the ID of the highlighted route
+
+    // Moved routeStyle to be accessible globally for resetting styles
+    function routeStyle(feature) {
+        if (!feature || !feature.properties) return { color: '#808080', weight: 5, opacity: 0.75 }; // Fallback
+        // Use window.globalRouteDetailsMap if direct feature.properties.route_color is not the source of truth after parsing
+        const routeDetails = window.globalRouteDetailsMap[feature.properties.route_id];
+        // feature.properties.route_color already includes '#' from processing step
+        const color = routeDetails ? routeDetails.color : (feature.properties.route_color ? feature.properties.route_color : '#808080');
+        return {
+            color: color,
+            weight: 5,
+            opacity: 0.75
+        };
+    }
 
     document.addEventListener('DOMContentLoaded', function() {
         // Initialize Leaflet map
@@ -108,16 +122,8 @@
             }
             console.log("File selected:", file.name);
 
-            // Reset any existing route highlighting
-            if (highlightedRouteLayer && highlightedRouteLayer.feature) {
-                // Re-apply the default style for that feature
-                // Note: routeStyle function is defined within displayGtfsDataOnMap,
-                // so it's not directly accessible here.
-                // For simplicity here, we just nullify.
-                // The old layer will be removed by displayGtfsDataOnMap,
-                // and new layers will get default styles.
-                window.highlightedRouteLayer = null;
-            }
+            // Reset any existing route highlighting state
+            window.highlightedRouteId = null;
             // Also reset the main stop selector to default
             document.getElementById('stopSelector').value = "";
 
@@ -336,43 +342,53 @@
             if (trips && trips.length > 0) {
                 trips.forEach(trip => {
                     if (trip.route_id && trip.shape_id) {
-                        routeToShapeMap[trip.route_id] = trip.shape_id;
+                        if (!routeToShapeMap[trip.route_id]) {
+                            routeToShapeMap[trip.route_id] = new Set();
+                        }
+                        routeToShapeMap[trip.route_id].add(trip.shape_id);
                     }
                 });
             }
-            console.log("Route to Shape Map:", routeToShapeMap);
+            // Convert Sets to Arrays for easier iteration later
+            for (const routeId in routeToShapeMap) {
+                routeToShapeMap[routeId] = Array.from(routeToShapeMap[routeId]);
+            }
+            console.log("Route to Shape Map (allows multiple shapes per route):", routeToShapeMap);
 
             // 4. Build the GeoJSON Features
             const geojsonFeatures = [];
             if (routes && routes.length > 0) {
                 routes.forEach(route => {
-                    const shapeId = routeToShapeMap[route.route_id];
-                    if (shapeId) {
-                        const coordinates = shapeGeometries[shapeId];
-                        if (coordinates && coordinates.length > 1) { // A LineString needs at least two points
-                            const feature = {
-                                type: "Feature",
-                                geometry: {
-                                    type: "LineString",
-                                    coordinates: coordinates
-                                },
-                                properties: {
-                                    route_id: route.route_id,
-                                    route_short_name: route.route_short_name,
-                                    route_long_name: route.route_long_name,
-                                    route_desc: route.route_desc,
-                                    route_type: route.route_type,
-                                    route_url: route.route_url,
-                                    route_color: route.route_color ? '#' + route.route_color : null, // Ensure # prefix for color
-                                    route_text_color: route.route_text_color ? '#' + route.route_text_color : null // Ensure # prefix
-                                }
-                            };
-                            geojsonFeatures.push(feature);
-                        } else {
-                            // console.warn(`Shape ${shapeId} for route ${route.route_id} has insufficient points.`);
-                        }
+                    const shapeIds = routeToShapeMap[route.route_id]; // This is now an array of shape_ids
+                    if (shapeIds && shapeIds.length > 0) {
+                        shapeIds.forEach(shapeId => {
+                            const coordinates = shapeGeometries[shapeId];
+                            if (coordinates && coordinates.length > 1) { // A LineString needs at least two points
+                                const feature = {
+                                    type: "Feature",
+                                    geometry: {
+                                        type: "LineString",
+                                        coordinates: coordinates
+                                    },
+                                    properties: {
+                                        route_id: route.route_id,
+                                        shape_id: shapeId, // Keep track of which shape this feature represents
+                                        route_short_name: route.route_short_name,
+                                        route_long_name: route.route_long_name,
+                                        route_desc: route.route_desc,
+                                        route_type: route.route_type,
+                                        route_url: route.route_url,
+                                        route_color: route.route_color ? '#' + route.route_color : null, // Ensure # prefix for color
+                                        route_text_color: route.route_text_color ? '#' + route.route_text_color : null // Ensure # prefix
+                                    }
+                                };
+                                geojsonFeatures.push(feature);
+                            } else {
+                                // console.warn(`Shape ${shapeId} for route ${route.route_id} has insufficient points.`);
+                            }
+                        });
                     } else {
-                        // console.warn(`No shape_id found for route ${route.route_id}.`);
+                        // console.warn(`No shape_ids found for route ${route.route_id}.`);
                     }
                 });
             }
@@ -395,20 +411,6 @@
         // let stopToRouteIdsData = null;
         // let globalRouteDetailsMap = {};
         // window.highlightedRouteLayer = null; // This one was already correctly global
-
-    // Moved routeStyle to be accessible globally for resetting styles
-    function routeStyle(feature) {
-        if (!feature || !feature.properties) return { color: '#808080', weight: 5, opacity: 0.75 }; // Fallback
-        // Use window.globalRouteDetailsMap if direct feature.properties.route_color is not the source of truth after parsing
-        const routeDetails = window.globalRouteDetailsMap[feature.properties.route_id];
-        // feature.properties.route_color already includes '#' from processing step
-        const color = routeDetails ? routeDetails.color : (feature.properties.route_color ? feature.properties.route_color : '#808080');
-        return {
-            color: color,
-            weight: 5,
-            opacity: 0.75
-        };
-    }
 
         function populateStopSelector(stopsGeoJson) {
             const selector = document.getElementById('stopSelector');
@@ -443,13 +445,9 @@
             const selectedStopId = event.target.value;
             console.log(`Filtering by selectedStopId: '${selectedStopId}' (type: ${typeof selectedStopId})`);
 
-            // Reset any existing route highlighting when main filter changes
-            if (window.highlightedRouteLayer && window.highlightedRouteLayer.feature) { // Use window.
-                // When the main filter changes, the currentRoutesLayer is cleared and redrawn
-                // by displayGtfsDataOnMap, which will apply the default routeStyle.
-                // So, just nullifying highlightedRouteLayer is sufficient.
-                window.highlightedRouteLayer = null;
-            }
+            // Reset any existing route highlighting state when main filter changes
+            // The visual unhighlighting will occur as routes are redrawn by displayGtfsDataOnMap.
+            window.highlightedRouteId = null;
 
             if (!window.fullRoutesGeoJson || !window.stopToRouteIdsData) { // Use window.
                 console.warn("Data not fully loaded yet for filtering (fullRoutesGeoJson or stopToRouteIdsData is missing).");
@@ -666,32 +664,38 @@
     }
 
     function handleRouteBadgeClick(routeId) {
-        console.log("Debug handleRouteBadgeClick: typeof window.highlightedRouteLayer:", typeof window.highlightedRouteLayer, "Value:", window.highlightedRouteLayer);
         console.log("Route badge clicked for routeId:", routeId);
+        const clickedRouteId = routeId; // Alias for clarity
 
-        // Unhighlight previously highlighted route
-        if (window.highlightedRouteLayer && window.highlightedRouteLayer.feature) {
-            // Re-apply the default style for that feature using the global routeStyle
-            window.highlightedRouteLayer.setStyle(routeStyle(window.highlightedRouteLayer.feature));
-            window.highlightedRouteLayer = null;
-        }
-
-        if (!window.currentRoutesLayer) { // Check window.currentRoutesLayer
+        if (!window.currentRoutesLayer) {
             console.warn("window.currentRoutesLayer is not available in handleRouteBadgeClick");
             return;
         }
 
-        // Find and highlight the new route
-        window.currentRoutesLayer.eachLayer(function(layer) { // Iterate window.currentRoutesLayer
-            if (layer.feature && layer.feature.properties && layer.feature.properties.route_id === routeId) {
-                // No need to store original style anymore, it will be re-calculated by routeStyle
-                layer.setStyle({ color: '#FF0000', weight: 7, opacity: 1.0 });
-                window.highlightedRouteLayer = layer; // Assign to window.highlightedRouteLayer
-                layer.bringToFront();
-                // map.fitBounds(layer.getBounds()); // Optional: zoom to selected route
-                return; // Exit eachLayer loop
-            }
-        });
+        // Unhighlight previously highlighted route (all its features)
+        if (window.highlightedRouteId) {
+            window.currentRoutesLayer.eachLayer(function(layer) {
+                if (layer.feature && layer.feature.properties && layer.feature.properties.route_id === window.highlightedRouteId) {
+                    layer.setStyle(routeStyle(layer.feature));
+                    // layer.bringToBack(); // Optional: send unhighlighted routes to back
+                }
+            });
+        }
+
+        // If the clicked route is different from the currently highlighted one, then highlight the new one.
+        // Otherwise (if same route is clicked again), it means we are toggling it off, and it's already unhighlighted.
+        if (window.highlightedRouteId !== clickedRouteId) {
+            window.highlightedRouteId = clickedRouteId; // Set new highlighted route
+            window.currentRoutesLayer.eachLayer(function(layer) {
+                if (layer.feature && layer.feature.properties && layer.feature.properties.route_id === window.highlightedRouteId) {
+                    layer.setStyle({ color: '#FF0000', weight: 7, opacity: 1.0 });
+                    layer.bringToFront();
+                }
+            });
+        } else {
+            window.highlightedRouteId = null; // Clear highlight if same route clicked (toggle off)
+        }
+
         map.closePopup(); // Close the popup after selection
     }
     </script>
