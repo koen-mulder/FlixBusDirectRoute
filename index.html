@@ -325,7 +325,16 @@
                     // highQuality: false for faster simplification.
                     const tolerance = 0.0001; // Adjust as needed
                     const highQuality = false;
-                    let simplifiedPoints = simplify(points, tolerance, highQuality);
+
+                    if (typeof window.simplify !== 'function') {
+                        console.error("simplify-js library not loaded correctly or 'simplify' is not a function on window object.");
+                        // Fallback: use original points if simplification fails
+                        shapeGeometries[shapeId] = points.map(p => [p.x, p.y]); // Ensure original points are in correct [lon, lat] format
+                        console.warn(`Simplification skipped for shapeId ${shapeId} due to missing simplify function.`);
+                        continue; // Skip to the next shapeId
+                    }
+
+                    let simplifiedPoints = window.simplify(points, tolerance, highQuality);
 
                     // Convert back to [lon, lat] format for GeoJSON
                     shapeGeometries[shapeId] = simplifiedPoints.map(p => [p.x, p.y]);
