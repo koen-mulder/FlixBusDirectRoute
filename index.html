@@ -52,8 +52,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"
      integrity="sha512-dfX5uYVXzyU8+KHqj8bjo7UkOdg18PaOtpa48djpNbZHwExddghZ+ZmzWT06R5v6NSk3ZUfsH6FNEDepLx9hPQ=="
      crossorigin="anonymous"></script>
-    <!-- simplify-js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/simplify-js/1.2.4/simplify.min.js"></script>
+    <!-- simplify-js (using jsDelivr as cdnjs was problematic) -->
+    <script src="https://cdn.jsdelivr.net/npm/simplify-js@1.2.4/simplify.min.js"></script>
 
     <script>
     let map = null;
@@ -323,8 +323,8 @@
                     // Tolerance is a critical parameter; 0.0001 is a starting value for lat/lon degrees.
                     // Higher tolerance = more simplification = fewer points.
                     // highQuality: false for faster simplification.
-                    const tolerance = 0.0001; // Adjust as needed
-                    const highQuality = false;
+                    const tolerance = 0.001; // Adjusted as per user request
+                    const highQuality = true;  // Adjusted as per user request
 
                     if (typeof window.simplify !== 'function') {
                         console.error("simplify-js library not loaded correctly or 'simplify' is not a function on window object.");
