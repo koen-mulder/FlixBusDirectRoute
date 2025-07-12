@@ -50,6 +50,16 @@ body {
     color: white;
 }
 
+main {
+    height: calc(100vh - 64px);
+    display: flex;
+    flex-direction: column;
+}
+
+#map {
+    flex-grow: 1;
+}
+
 .mdc-top-app-bar--fixed-adjust {
     padding-top: 64px;
 }
