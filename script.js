@@ -29,7 +29,13 @@ function routeStyle(feature) {
 
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize Leaflet map
-    map = L.map('map').setView([51.505, -0.09], 13); // Assign to global map
+    map = L.map('map', {
+        zoomControl: false
+    }).setView([51.505, -0.09], 13); // Assign to global map
+
+    L.control.zoom({
+        position: 'bottomright'
+    }).addTo(map);
 
     // Create custom panes for layer ordering
     map.createPane('routePane');

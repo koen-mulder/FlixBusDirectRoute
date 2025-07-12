@@ -77,8 +77,12 @@ main {
     flex-direction: column;
 }
 
-.floating-panel .mdc-select {
+.floating-panel .panel-section {
     margin-bottom: 16px;
+}
+
+.floating-panel .panel-section:last-child {
+    margin-bottom: 0;
 }
 
 @media (max-width: 600px) {
