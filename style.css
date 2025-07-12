@@ -87,6 +87,14 @@ main {
     padding: 0 4px;
 }
 
+.mdc-select:not(.mdc-select--disabled) .mdc-select__selected-text {
+    color: rgba(0, 0, 0, 0.6);
+}
+
+.mdc-list-item--selected {
+    font-style: normal;
+}
+
 .floating-panel .panel-section:last-child {
     margin-bottom: 0;
 }
