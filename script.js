@@ -371,13 +371,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // window.highlightedRouteLayer = null; // This one was already correctly global
 
     function populateStopSelector(stopsGeoJson) {
-        const list = document.querySelector('.mdc-select__menu .mdc-list');
+            const selectElement = document.querySelector('.mdc-select');
+            const list = selectElement.querySelector('.mdc-list');
         // Clear existing options except the first one
         while (list.children.length > 1) {
             list.removeChild(list.lastChild);
         }
 
-        if (stopsGeoJson && stopsGeoJson.features) {
+            if (stopsGeoJson && stopsGeoJson.features && stopsGeoJson.features.length > 0) {
+                selectElement.classList.add('mdc-select--populated');
             // Sort stops by name for easier selection
             const sortedStops = [...stopsGeoJson.features].sort((a, b) => {
                 const nameA = a.properties.stop_name.toLowerCase();

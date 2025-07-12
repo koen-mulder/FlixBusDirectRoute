@@ -64,21 +64,27 @@ main {
     padding-top: 64px;
 }
 
-.floating-panel {
+.floating-panel-container {
     position: absolute;
     top: 80px;
     left: 10px;
     z-index: 1000;
-    background: white;
-    padding: 16px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
     display: flex;
     flex-direction: column;
 }
 
-.floating-panel .panel-section {
-    margin-bottom: 16px;
+.floating-panel {
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    margin-bottom: 10px;
+}
+
+.mdc-select--populated .mdc-floating-label {
+    transform: translateY(-100%) scale(0.75);
+    background-color: white;
+    padding: 0 4px;
 }
 
 .floating-panel .panel-section:last-child {
