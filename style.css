@@ -1,0 +1,66 @@
+body {
+    margin: 0;
+    font-family: 'Roboto', sans-serif;
+}
+
+.mdc-top-app-bar {
+    background-color: #6200ee;
+}
+
+.mdc-top-app-bar__title {
+    color: white;
+}
+
+.mdc-button__label {
+    color: white;
+}
+
+.mdc-select--outlined .mdc-floating-label {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.mdc-select--outlined .mdc-select__selected-text {
+    color: white;
+}
+
+.mdc-select--outlined .mdc-select__dropdown-icon {
+    fill: rgba(255, 255, 255, 0.6);
+}
+
+.mdc-line-ripple::before, .mdc-line-ripple::after {
+    border-bottom-color: rgba(255, 255, 255, 0.6);
+}
+
+.leaflet-popup-content-wrapper {
+    border-radius: 8px;
+}
+
+.leaflet-popup-content {
+    font-size: 14px;
+}
+
+.leaflet-popup-content strong {
+    font-weight: 500;
+}
+
+.route-badge {
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-weight: 500;
+    color: white;
+}
+
+.mdc-top-app-bar--fixed-adjust {
+    padding-top: 64px;
+}
+
+@media (max-width: 600px) {
+    .mdc-top-app-bar__section--align-end {
+        flex-direction: column;
+        align-items: flex-end;
+    }
+
+    .mdc-select {
+        margin-bottom: 8px;
+    }
+}
