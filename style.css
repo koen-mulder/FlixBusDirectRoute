@@ -64,6 +64,23 @@ main {
     padding-top: 64px;
 }
 
+.floating-panel {
+    position: absolute;
+    top: 80px;
+    left: 10px;
+    z-index: 1000;
+    background: white;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+}
+
+.floating-panel .mdc-select {
+    margin-bottom: 16px;
+}
+
 @media (max-width: 600px) {
     .mdc-top-app-bar__section--align-end {
         flex-direction: column;
@@ -72,5 +89,11 @@ main {
 
     .mdc-select {
         margin-bottom: 8px;
+    }
+
+    .floating-panel {
+        top: 70px;
+        left: 5px;
+        right: 5px;
     }
 }

@@ -19,33 +19,34 @@
             <section class="mdc-top-app-bar__section mdc-top-app-bar__section--align-start">
                 <span class="mdc-top-app-bar__title">GTFS Route Viewer</span>
             </section>
-            <section class="mdc-top-app-bar__section mdc-top-app-bar__section--align-end">
-                <div class="mdc-select mdc-select--outlined" aria-label="Filter routes by stop">
-                    <div class="mdc-select__anchor">
-                        <span class="mdc-select__ripple"></span>
-                        <span class="mdc-floating-label">Filter by Stop</span>
-                        <span class="mdc-select__selected-text-container">
-                            <span id="stopSelectorText" class="mdc-select__selected-text"></span>
-                        </span>
-                        <span class="mdc-line-ripple"></span>
-                    </div>
-                    <div class="mdc-select__menu mdc-menu mdc-menu-surface">
-                        <ul class="mdc-list" role="listbox">
-                            <li class="mdc-list-item mdc-list-item--selected" data-value="" role="option">
-                                <span class="mdc-list-item__ripple"></span>
-                                <span class="mdc-list-item__text">-- Select a Stop to Filter Routes --</span>
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-                <button class="mdc-button mdc-button--raised" aria-label="Upload a GTFS zip file">
-                    <span class="mdc-button__label">Upload GTFS</span>
-                    <input type="file" id="gtfsFile" accept=".zip" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0;">
-                </button>
             </section>
         </div>
     </header>
     <main class="mdc-top-app-bar--fixed-adjust">
+        <div class="floating-panel">
+            <div class="mdc-select mdc-select--outlined" aria-label="Filter routes by stop">
+                <div class="mdc-select__anchor">
+                    <span class="mdc-select__ripple"></span>
+                    <span class="mdc-floating-label">Filter by Stop</span>
+                    <span class="mdc-select__selected-text-container">
+                        <span id="stopSelectorText" class="mdc-select__selected-text"></span>
+                    </span>
+                    <span class="mdc-line-ripple"></span>
+                </div>
+                <div class="mdc-select__menu mdc-menu mdc-menu-surface">
+                    <ul class="mdc-list" role="listbox">
+                        <li class="mdc-list-item mdc-list-item--selected" data-value="" role="option">
+                            <span class="mdc-list-item__ripple"></span>
+                            <span class="mdc-list-item__text">-- Select a Stop to Filter Routes --</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <button class="mdc-button mdc-button--raised" aria-label="Upload a GTFS zip file">
+                <span class="mdc-button__label">Upload GTFS</span>
+                <input type="file" id="gtfsFile" accept=".zip" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; opacity: 0;">
+            </button>
+        </div>
         <div id="map"></div>
     </main>
     <div id="loadingPopup" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px; background: rgba(0,0,0,0.8); color: white; border-radius: 10px; z-index: 2000; font-size: 1.2em; box-shadow: 0 0 15px rgba(0,0,0,0.5);">
