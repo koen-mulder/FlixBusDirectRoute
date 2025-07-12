@@ -63,7 +63,9 @@ document.addEventListener('DOMContentLoaded', function() {
         // Reset any existing route highlighting state
         window.highlightedRouteId = null;
         // Also reset the main stop selector to default
-        document.getElementById('stopSelector').value = "";
+        const selectElement = document.querySelector('.mdc-select');
+        selectElement.classList.remove('mdc-select--populated');
+        select.value = "";
 
 
         loadingPopup.textContent = 'Loading and unzipping file...';
