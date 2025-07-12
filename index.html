@@ -4,40 +4,91 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>GTFS Route Viewer</title>
+    <!-- Material Design Lite -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css">
+    <script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
      crossorigin=""/>
     <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
+        }
+        .mdl-layout__content {
+            height: 100%;
+        }
         #map {
-            height: 100vh;
+            height: 100%;
             width: 100%;
         }
-        body {
-            margin: 0;
-            font-family: sans-serif;
+        .mdl-navigation__link {
+            padding: 16px;
         }
-        input[type="file"] {
-            position: absolute;
-            top: 10px;
-            left: 55px; /* Changed from 10px */
-            z-index: 1000; /* Ensure it's above the map */
-            padding: 10px;
-            background: white;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+        .mdl-textfield {
+            width: 100%;
+        }
+        #loadingPopup {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 2000;
+            font-size: 1.2em;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+            text-align: center;
+        }
+        #loadingText {
+            margin-left: 15px;
+            vertical-align: middle;
         }
     </style>
 </head>
 <body>
-    <label for="gtfsFile" style="position: absolute; top: 10px; left: 10px; z-index: 1000; background: white; padding: 5px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.8em;">Upload GTFS:</label>
-    <input type="file" id="gtfsFile" accept=".zip" style="position: absolute; top: 10px; left: 120px; z-index: 1000; padding: 5px; background: white; border: 1px solid #ccc; border-radius: 5px; font-size: 0.8em;">
-    <select id="stopSelector" style="position: absolute; top: 60px; left: 55px; z-index: 1000; padding: 5px; background: white; border: 1px solid #ccc; border-radius: 5px; max-width: 200px;">
-        <option value="">-- Select a Stop to Filter Routes --</option>
-    </select>
-    <div id="map"></div>
-    <div id="loadingPopup" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); padding: 20px; background: rgba(0,0,0,0.8); color: white; border-radius: 10px; z-index: 2000; font-size: 1.2em; box-shadow: 0 0 15px rgba(0,0,0,0.5);">
-        Loading GTFS data...
+    <!-- MDL Layout -->
+    <div class="mdl-layout mdl-js-layout mdl-layout--fixed-header">
+        <header class="mdl-layout__header">
+            <div class="mdl-layout__header-row">
+                <span class="mdl-layout-title">GTFS Route Viewer</span>
+            </div>
+        </header>
+        <div class="mdl-layout__drawer">
+            <span class="mdl-layout-title">Controls</span>
+            <nav class="mdl-navigation">
+                <div class="mdl-navigation__link">
+                    <button id="uploadButton" class="mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect mdl-button--accent">
+                        Upload GTFS
+                    </button>
+                    <input type="file" id="gtfsFile" accept=".zip" style="display: none;">
+                </div>
+                <div class="mdl-navigation__link">
+                    <div class="mdl-textfield mdl-js-textfield">
+                        <select id="stopSelector" class="mdl-textfield__input">
+                            <option value="">-- Select a Stop --</option>
+                        </select>
+                        <label class="mdl-textfield__label" for="stopSelector"></label>
+                    </div>
+                </div>
+            </nav>
+        </div>
+        <main class="mdl-layout__content">
+            <div id="map"></div>
+        </main>
+    </div>
+
+    <!-- Loading Popup -->
+    <div id="loadingPopup">
+        <div class="mdl-spinner mdl-js-spinner is-active"></div>
+        <br>
+        <span id="loadingText">Loading GTFS data...</span>
     </div>
 
     <!-- Leaflet JS -->
@@ -97,7 +148,13 @@
 
         // File input handling
         const fileInput = document.getElementById('gtfsFile');
+        const uploadButton = document.getElementById('uploadButton');
         const loadingPopup = document.getElementById('loadingPopup');
+        const loadingText = document.getElementById('loadingText');
+
+        uploadButton.addEventListener('click', () => {
+            fileInput.click();
+        });
 
         fileInput.addEventListener('change', async function(event) {
             const file = event.target.files[0];
@@ -113,14 +170,14 @@
             document.getElementById('stopSelector').value = "";
 
 
-            loadingPopup.textContent = 'Loading and unzipping file...';
+            loadingText.textContent = 'Loading and unzipping file...';
             loadingPopup.style.display = 'block';
             document.body.style.cursor = 'wait'; // Show wait cursor
 
             try {
                 const zip = await JSZip.loadAsync(file);
                 console.log("ZIP file loaded.");
-                loadingPopup.textContent = 'Parsing GTFS data files...'; // General message before detailed loop
+                loadingText.textContent = 'Parsing GTFS data files...'; // General message before detailed loop
 
                 const requiredFiles = ["routes.txt", "trips.txt", "shapes.txt", "stops.txt", "stop_times.txt"];
                 const parsedData = {
@@ -139,7 +196,7 @@
                     } else {
                         fileKey = fileKey.replace(/_/g, ''); // Replaces all underscores
                     }
-                    loadingPopup.textContent = `Parsing ${fileName} (${i + 1} of ${requiredFiles.length})...`;
+                    loadingText.textContent = `Parsing ${fileName} (${i + 1} of ${requiredFiles.length})...`;
 
                     const fileInZip = zip.file(fileName);
                     if (fileInZip) {
@@ -186,7 +243,7 @@
                     parsedData.stopTimes
                 );
                 // console.log("Processed GTFS Data (for GeoJSON):", processedData); // Will log routesGeoJson and stopsGeoJson
-                loadingPopup.textContent = 'Processing data and building map layers...';
+                loadingText.textContent = 'Processing data and building map layers...';
 
                 // Store data for potential filtering and display
                 if (processedData) {
